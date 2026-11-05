@@ -1,0 +1,29 @@
+﻿# ===== Núcleo de datos =====
+pandas>=2.2
+numpy>=1.26
+
+# ===== Conexión a MySQL =====
+sqlalchemy>=2.0,<3.0
+pymysql>=1.1
+cryptography>=42.0        # necesaria para la autenticación por defecto de MySQL 8
+
+# ===== Configuración y secretos =====
+python-dotenv>=1.0
+
+# ===== Extracción de fuentes =====
+comtradeapicall           # cliente oficial de UN Comtrade
+requests>=2.31
+tenacity>=8.2             # reintentos automáticos ante fallos de API
+openpyxl>=3.1             # leer Excel (CNA / BCE)
+pdfplumber>=0.11          # extraer tablas de PDF si la fuente solo publica PDF
+
+# ===== Calidad y pruebas =====
+pytest>=8.0
+
+# ===== API (Fase 11) =====
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
+# ===== EDA (Fase 10) =====
+jupyter>=1.0
+matplotlib>=3.8

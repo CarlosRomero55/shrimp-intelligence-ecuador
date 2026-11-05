@@ -1,0 +1,25 @@
+﻿# ===== Secretos: NUNCA se suben =====
+.env
+
+# ===== Entorno virtual de Python =====
+.venv/
+
+# ===== Archivos temporales de Python y Jupyter =====
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ===== Datos y logs: se regeneran con el pipeline =====
+data/raw/*
+data/processed/*
+logs/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!logs/.gitkeep
+
+# ===== Editores y sistema operativo =====
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
