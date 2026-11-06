@@ -1,13 +1,4 @@
-"""
-db.py — Única puerta de entrada entre Python y MySQL.
 
-Todos los scripts del pipeline (extracción, limpieza, conciliación, gold)
-leen y escriben a través de este módulo. Así la conexión, el manejo de
-errores y la forma de escribir datos son iguales en todo el proyecto.
-
-Pasos: 3.1 get_engine() + check_connection() · 3.2 logging · 3.3 read_sql()
-       3.4 write_df() (bronze) · 3.5 upsert() (silver/gold).
-"""
 from __future__ import annotations
 
 import logging
@@ -311,126 +302,10 @@ def upsert(
     return result
 
 
-def _test_write_df() -> None:
-    """
-    Prueba de write_df SIN dejar rastro: inserta dentro de una transacción,
-    cuenta las filas y hace ROLLBACK (bronze no permite DELETE).
-    """
-    import hashlib
-    import uuid
-    from datetime import datetime
-
-    # 3 filas con problemas de calidad típicos (así llegarán desde la simulación)
-    rows = [
-        {"farm_name": "TEST Finca Guayas", "province": "Guayas", "pond_code": "GY-P01",
-         "pond_area_ha": "8.5", "cycle_code": "GY-P01-2025-01",
-         "stocking_date": "2025-01-10", "harvest_date": "15/04/2025",
-         "size_grade": "20/30", "harvested_qty": "12500", "harvested_unit": "lb",
-         "fcr": "1.35", "destination_market": "EEUU"},
-        {"farm_name": "TEST Finca El Oro", "province": "El Oro", "pond_code": "EO-P03",
-         "pond_area_ha": "6,2", "cycle_code": "EO-P03-2025-01",
-         "stocking_date": "2025-02-03", "harvest_date": "2025-05-28",
-         "size_grade": "20-30", "harvested_qty": "5600", "harvested_unit": "kg",
-         "fcr": "1.42", "destination_market": "Estados Unidos"},
-        {"farm_name": "TEST Finca Santa Elena", "province": "Santa Elena",
-         "pond_code": "SE-P02", "pond_area_ha": "10", "cycle_code": "SE-P02-2025-01",
-         "stocking_date": "03/03/2025", "harvest_date": "2025-06-20",
-         "size_grade": "30 40", "harvested_qty": "18000", "harvested_unit": "lb",
-         "fcr": "15", "destination_market": "USA"},
-    ]
-    df = pd.DataFrame(rows)
-
-    # Huella digital del CONTENIDO (sin columnas de auditoría): el mismo dato
-    # extraído dos veces produce el mismo hash → permite detectar duplicados
-    df["record_hash"] = df.apply(
-        lambda r: hashlib.sha256("|".join(map(str, r.values)).encode("utf-8")).hexdigest(),
-        axis=1,
-    )
-
-    # Duplicado exacto de la primera fila: 4 filas entran, 3 deben insertarse
-    df = pd.concat([df, df.iloc[[0]]], ignore_index=True)
-
-    # Columnas de auditoría
-    # uuid4().hex = 32 caracteres sin guiones → "test-" + 32 = 37 (cabe en varchar(40))
-    batch_id = f"test-{uuid.uuid4().hex}"
-    df["source_name"] = "test_write_df"
-    df["batch_id"] = batch_id
-    df["extracted_at"] = datetime.now()
-
-    count_sql = text("SELECT COUNT(*) FROM bronze.farm_raw WHERE batch_id = :b")
-
-    with get_engine().connect() as conn:
-        trans = conn.begin()
-        try:
-            write_df(df, "bronze", "farm_raw", dedupe_on=["record_hash"], conn=conn)
-            n_inside = conn.execute(count_sql, {"b": batch_id}).scalar_one()
-        finally:
-            trans.rollback()   # pase lo que pase, no queda nada en bronze
-        n_after = conn.execute(count_sql, {"b": batch_id}).scalar_one()
-
-    print(f"Filas dentro de la transacción: {n_inside} | después del ROLLBACK: {n_after}")
-
-
-def _test_upsert() -> None:
-    """
-    Prueba de upsert SIN dejar rastro (transacción + ROLLBACK) en silver.regions:
-    1) carga 2 regiones nuevas  2) re-carga 1 editada + 1 nueva  → 3 filas, no 4.
-    Códigos 991..993: cumplen el CHECK (3 dígitos) y no existen en el estándar M49.
-    """
-    test_codes = ("991", "992", "993")
-    first = pd.DataFrame([
-        {"m49_region_code": "991", "region_name_es": "TEST Región A",
-         "region_name_en": "TEST Region A"},
-        {"m49_region_code": "992", "region_name_es": "TEST Región B",
-         "region_name_en": "TEST Region B"},
-    ])
-    second = pd.DataFrame([
-        {"m49_region_code": "992", "region_name_es": "TEST Región B (editada)",
-         "region_name_en": "TEST Region B (edited)"},
-        {"m49_region_code": "993", "region_name_es": "TEST Región C",
-         "region_name_en": "TEST Region C"},
-    ])
-    count_sql = text(
-        "SELECT COUNT(*) FROM silver.regions WHERE m49_region_code IN :codes"
-    ).bindparams(bindparam("codes", expanding=True))
-    name_sql = text("SELECT region_name_es FROM silver.regions WHERE m49_region_code = '992'")
-
-    with get_engine().connect() as conn:
-        trans = conn.begin()
-        try:
-            upsert(first, "silver", "regions", key_cols=["m49_region_code"], conn=conn)
-            upsert(second, "silver", "regions", key_cols=["m49_region_code"], conn=conn)
-            n_inside = conn.execute(count_sql, {"codes": list(test_codes)}).scalar_one()
-            name_992 = conn.execute(name_sql).scalar_one()
-        finally:
-            trans.rollback()   # nada queda en silver
-        n_after = conn.execute(count_sql, {"codes": list(test_codes)}).scalar_one()
-
-    print(f"Filas de prueba: {n_inside} | nombre de 992: '{name_992}' "
-          f"| después del ROLLBACK: {n_after}")
-
-
-# Punto de entrada para pruebas: python -m src.db
+# Prueba de vida rápida: python -m src.db
+# (las pruebas completas están en tests/test_db.py)
 if __name__ == "__main__":
     from src.logging_config import setup_logging
 
     setup_logging()
-    if check_connection():
-        # Prueba de read_sql con parámetro enlazado
-        df_dates = read_sql(
-            """
-            SELECT date_key, full_date, calendar_year, calendar_month,
-                   month_name_es, ec_coastal_season
-            FROM gold.dim_date
-            WHERE calendar_year = :year
-            ORDER BY date_key
-            """,
-            {"year": 2025},
-        )
-        print(f"dim_date 2025: {df_dates.shape}")
-
-        # Prueba de write_df con ROLLBACK (bronze)
-        _test_write_df()
-
-        # Prueba de upsert con ROLLBACK (silver)
-        _test_upsert()
+    check_connection()
