@@ -6,7 +6,7 @@ leen y escriben a través de este módulo. Así la conexión, el manejo de
 errores y la forma de escribir datos son iguales en todo el proyecto.
 
 Pasos: 3.1 get_engine() + check_connection() · 3.2 logging · 3.3 read_sql()
-       3.4 write_df().
+       3.4 write_df() (bronze) · 3.5 upsert() (silver/gold).
 """
 from __future__ import annotations
 
@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Esquemas de la arquitectura Medallion (+ ops para la bitácora del ETL)
 SCHEMAS = ("ops", "bronze", "silver", "gold")
+
+# Esquemas donde se permite upsert (bronze es inmutable: solo write_df)
+UPSERT_SCHEMAS = ("ops", "silver", "gold")
 
 # Errores de base de datos que atrapamos al leer/escribir.
 # pandas envuelve los de SQLAlchemy en pandas.errors.DatabaseError.
@@ -144,7 +147,7 @@ def write_df(
     Inserta un DataFrame en schema.table por lotes (solo INSERT / append).
 
     - Pensado para bronze: no actualiza ni borra (bronze no tiene esos permisos).
-      Para silver/gold se usará upsert() (paso 3.5).
+      Para silver/gold se usa upsert().
     - if_exists="append" está FIJO: no existe forma de hacer "replace" (DROP)
       desde aquí, ni por error.
     - dedupe_on: columnas que identifican una fila única (ej. ["record_hash"]);
@@ -197,6 +200,115 @@ def write_df(
     logger.info("write_df: %s filas → %s.%s en %s lote(s) | %.2f s",
                 len(df), schema, table, n_batches, elapsed)
     return len(df)
+
+
+def _table_columns(conn: Connection, schema: str, table: str) -> set[str]:
+    """Devuelve los nombres reales de las columnas de schema.table (lista blanca)."""
+    cols = conn.execute(
+        text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = :s AND table_name = :t
+            """
+        ),
+        {"s": schema, "t": table},
+    ).scalars().all()
+    if not cols:
+        raise ValueError(f"La tabla {schema}.{table} no existe o el usuario no tiene permisos")
+    return set(cols)
+
+
+def upsert(
+    df: pd.DataFrame,
+    schema: str,
+    table: str,
+    key_cols: list[str],
+    *,
+    chunksize: int = 1000,
+    conn: Connection | None = None,
+) -> dict[str, int]:
+    """
+    Inserta filas nuevas y actualiza las existentes (silver/gold). Idempotente:
+    ejecutarlo dos veces con los mismos datos no duplica nada.
+
+    - key_cols: llave de NEGOCIO que identifica la fila (debe tener PK o UNIQUE
+      en la tabla), ej. ["m49_region_code"]. No se actualizan; el resto sí.
+    - No enviar llaves sustitutas auto_increment (ej. region_id): MySQL las asigna.
+    - Los nombres de tabla/columna se validan contra information_schema antes
+      de armar el SQL (no pueden ir como parámetros enlazados).
+    - conn: igual que en write_df (transacción externa sin commit, o propia).
+
+    Devuelve {"rows": n, "inserted": nuevas, "existing": ya existían}.
+    """
+    if schema not in UPSERT_SCHEMAS:
+        raise ValueError(f"upsert no permitido en '{schema}'. "
+                         "bronze es inmutable: usar write_df().")
+    if df.empty:
+        logger.warning("upsert: DataFrame vacío, nada que cargar en %s.%s", schema, table)
+        return {"rows": 0, "inserted": 0, "existing": 0}
+
+    cols = list(df.columns)
+    missing_keys = [k for k in key_cols if k not in cols]
+    if missing_keys:
+        raise ValueError(f"upsert: faltan columnas llave en el DataFrame: {missing_keys}")
+    update_cols = [c for c in cols if c not in key_cols]
+    if not update_cols:
+        raise ValueError("upsert: no hay columnas para actualizar (solo llaves)")
+
+    # NaN de pandas → None, que el driver envía como NULL
+    records = df.astype(object).where(df.notna(), None).to_dict("records")
+
+    def _run(connection: Connection) -> dict[str, int]:
+        # 1) Lista blanca: toda columna del DataFrame debe existir en la tabla
+        unknown = set(cols) - _table_columns(connection, schema, table)
+        if unknown:
+            raise ValueError(f"upsert: columnas inexistentes en {schema}.{table}: "
+                             f"{sorted(unknown)}")
+
+        # 2) Partes fijas del SQL (nombres ya validados, entre backticks)
+        target = f"`{schema}`.`{table}`"
+        col_sql = ", ".join(f"`{c}`" for c in cols)
+        update_sql = ", ".join(f"`{c}` = new_row.`{c}`" for c in update_cols)
+        count_sql = text(f"SELECT COUNT(*) FROM {target}")
+
+        before = connection.execute(count_sql).scalar_one()
+
+        # 3) Un INSERT multi-fila por lote; cada valor va como parámetro enlazado
+        for start_idx in range(0, len(records), chunksize):
+            chunk = records[start_idx:start_idx + chunksize]
+            placeholders, params = [], {}
+            for j, rec in enumerate(chunk):
+                placeholders.append("(" + ", ".join(f":{c}_{j}" for c in cols) + ")")
+                for c in cols:
+                    params[f"{c}_{j}"] = rec[c]
+            stmt = text(
+                f"INSERT INTO {target} ({col_sql}) VALUES {', '.join(placeholders)} "
+                f"AS new_row ON DUPLICATE KEY UPDATE {update_sql}"
+            )
+            connection.execute(stmt, params)
+
+        after = connection.execute(count_sql).scalar_one()
+        inserted = after - before
+        return {"rows": len(records), "inserted": inserted,
+                "existing": len(records) - inserted}
+
+    start = time.perf_counter()
+    try:
+        if conn is not None:
+            result = _run(conn)
+        else:
+            with get_engine().begin() as own_conn:
+                result = _run(own_conn)
+    except DB_ERRORS:
+        logger.exception("upsert falló en %s.%s (%s filas)", schema, table, len(records))
+        raise
+
+    elapsed = time.perf_counter() - start
+    logger.info("upsert: %s filas → %s.%s | nuevas: %s | ya existían: %s | %.2f s",
+                result["rows"], schema, table, result["inserted"],
+                result["existing"], elapsed)
+    return result
 
 
 def _test_write_df() -> None:
@@ -259,6 +371,45 @@ def _test_write_df() -> None:
     print(f"Filas dentro de la transacción: {n_inside} | después del ROLLBACK: {n_after}")
 
 
+def _test_upsert() -> None:
+    """
+    Prueba de upsert SIN dejar rastro (transacción + ROLLBACK) en silver.regions:
+    1) carga 2 regiones nuevas  2) re-carga 1 editada + 1 nueva  → 3 filas, no 4.
+    Códigos 991..993: cumplen el CHECK (3 dígitos) y no existen en el estándar M49.
+    """
+    test_codes = ("991", "992", "993")
+    first = pd.DataFrame([
+        {"m49_region_code": "991", "region_name_es": "TEST Región A",
+         "region_name_en": "TEST Region A"},
+        {"m49_region_code": "992", "region_name_es": "TEST Región B",
+         "region_name_en": "TEST Region B"},
+    ])
+    second = pd.DataFrame([
+        {"m49_region_code": "992", "region_name_es": "TEST Región B (editada)",
+         "region_name_en": "TEST Region B (edited)"},
+        {"m49_region_code": "993", "region_name_es": "TEST Región C",
+         "region_name_en": "TEST Region C"},
+    ])
+    count_sql = text(
+        "SELECT COUNT(*) FROM silver.regions WHERE m49_region_code IN :codes"
+    ).bindparams(bindparam("codes", expanding=True))
+    name_sql = text("SELECT region_name_es FROM silver.regions WHERE m49_region_code = '992'")
+
+    with get_engine().connect() as conn:
+        trans = conn.begin()
+        try:
+            upsert(first, "silver", "regions", key_cols=["m49_region_code"], conn=conn)
+            upsert(second, "silver", "regions", key_cols=["m49_region_code"], conn=conn)
+            n_inside = conn.execute(count_sql, {"codes": list(test_codes)}).scalar_one()
+            name_992 = conn.execute(name_sql).scalar_one()
+        finally:
+            trans.rollback()   # nada queda en silver
+        n_after = conn.execute(count_sql, {"codes": list(test_codes)}).scalar_one()
+
+    print(f"Filas de prueba: {n_inside} | nombre de 992: '{name_992}' "
+          f"| después del ROLLBACK: {n_after}")
+
+
 # Punto de entrada para pruebas: python -m src.db
 if __name__ == "__main__":
     from src.logging_config import setup_logging
@@ -278,5 +429,8 @@ if __name__ == "__main__":
         )
         print(f"dim_date 2025: {df_dates.shape}")
 
-        # Prueba de write_df con ROLLBACK
+        # Prueba de write_df con ROLLBACK (bronze)
         _test_write_df()
+
+        # Prueba de upsert con ROLLBACK (silver)
+        _test_upsert()
