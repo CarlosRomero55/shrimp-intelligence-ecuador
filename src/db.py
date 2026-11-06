@@ -1,25 +1,20 @@
-"""
-db.py — Única puerta de entrada entre Python y MySQL.
 
-Todos los scripts del pipeline (extracción, limpieza, conciliación, gold)
-leen y escriben a través de este módulo. Así la conexión, el manejo de
-errores y la forma de escribir datos son iguales en todo el proyecto.
-
-Paso 3.1: get_engine() + check_connection().
-"""
 from __future__ import annotations
+
+import logging
 
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import URL, Engine
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-
 from src.config import settings
+
+
+logger = logging.getLogger(__name__)
 
 # Esquemas de la arquitectura Medallion (+ ops para la bitácora del ETL)
 SCHEMAS = ("ops", "bronze", "silver", "gold")
 
-# Motor único del proceso. Empieza vacío y se crea en el primer uso.
 _engine: Engine | None = None
 
 
@@ -28,7 +23,6 @@ def get_engine() -> Engine:
     global _engine
     if _engine is None:
         # URL.create escapa caracteres especiales de la contraseña (@, #, :)
-        # que romperían una URL armada a mano con f-strings.
         url = URL.create(
             drivername="mysql+pymysql",       # dialecto MySQL + driver PyMySQL
             username=settings.db_user,
@@ -43,22 +37,20 @@ def get_engine() -> Engine:
             max_overflow=5,      # conexiones extra temporales en picos
             pool_pre_ping=True,  # verifica que la conexión siga viva antes de usarla
             pool_recycle=3600,   # renueva conexiones de más de 1 hora
-                                 # (evita "MySQL server has gone away")
         )
+        
+        logger.debug("Motor creado: %s", url.render_as_string(hide_password=True))
     return _engine
 
 
 def check_connection() -> bool:
     """Prueba de vida: versión de MySQL, usuario y tablas visibles por esquema."""
     try:
-        # "with" devuelve la conexión al pool al terminar, aunque haya error
         with get_engine().connect() as conn:
             version, user = conn.execute(
                 text("SELECT VERSION(), CURRENT_USER()")
             ).one()
 
-            # expanding=True convierte la tupla en IN ('ops','bronze',...)
-            # de forma segura (sin concatenar texto en el SQL)
             query = text(
                 """
                 SELECT table_schema, COUNT(*) AS n_tables
@@ -70,25 +62,32 @@ def check_connection() -> bool:
             ).bindparams(bindparam("schemas", expanding=True))
             tables = conn.execute(query, {"schemas": list(SCHEMAS)}).all()
 
-        print(f"Conexión OK | MySQL {version} | usuario: {user}")
+        # %s en vez de f-string: el texto solo se arma si el nivel se va a registrar
+        logger.info("Conexión OK | MySQL %s | usuario: %s", version, user)
         visibles = {schema: n for schema, n in tables}
         for schema in SCHEMAS:
-            # Si un esquema sale 0, el usuario no tiene permisos sobre él
-            print(f"  - {schema:<7}: {visibles.get(schema, 0)} tablas visibles")
+            n = visibles.get(schema, 0)
+            if n == 0:
+                # Sin tablas visibles = problema de permisos → WARNING
+                logger.warning("Esquema %s: 0 tablas visibles (revisar GRANT)", schema)
+            else:
+                logger.info("Esquema %-7s: %s tablas visibles", schema, n)
         return True
 
     except OperationalError as exc:
-        # Errores de red o credenciales. El mensaje de PyMySQL no incluye
-        # la contraseña, así que es seguro mostrarlo.
-        print(f"Conexión FALLIDA: {exc.orig}")
-        print("Pistas: 1045 = usuario/contraseña en .env | "
-              "2003 = MySQL apagado o host/puerto incorrecto")
+        logger.error("Conexión FALLIDA: %s", exc.orig)
+        logger.error("Pistas: 1045 = usuario/contraseña en .env | "
+                     "2003 = MySQL apagado o host/puerto incorrecto")
         return False
-    except SQLAlchemyError as exc:
-        print(f"Error de SQLAlchemy: {exc}")
+    except SQLAlchemyError:
+        # logger.exception = ERROR + traza completa del error en el archivo
+        logger.exception("Error de SQLAlchemy al verificar la conexión")
         return False
 
 
-# Permite probar el módulo directamente con: python -m src.db
+# Punto de entrada para pruebas: python -m src.db
 if __name__ == "__main__":
+    from src.logging_config import setup_logging
+
+    setup_logging()
     check_connection()
