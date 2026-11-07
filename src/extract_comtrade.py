@@ -1,19 +1,4 @@
-"""
-extract_comtrade.py — Extracción de exportaciones de camarón de Ecuador desde UN Comtrade.
 
-Dos modos (misma tabla bronze.comtrade_raw, distinguidos por flow_code y source_name):
-  export  → lo que ECUADOR reporta como exportado (flow X, reporter 218, todos los destinos)
-  mirror  → lo que el RESTO DEL MUNDO reporta como importado desde Ecuador
-            (flow M, todos los reporters, partner 218). Valores CIF.
-
-Hallazgo documentado: Comtrade no tiene publicados de Ecuador Feb 2022–Dic 2023,
-Abr 2024 ni 2025. El espejo cubre el detalle por país de esos meses; el total
-nacional oficial viene del BCE (extract_bce.py).
-
-Uso:
-    python -m src.extract_comtrade            # exportaciones de Ecuador
-    python -m src.extract_comtrade --mirror   # estadísticas espejo
-"""
 from __future__ import annotations
 
 import argparse
