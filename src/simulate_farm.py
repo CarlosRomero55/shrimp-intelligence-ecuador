@@ -1,31 +1,22 @@
-"""
-simulate_farm.py — Datos simulados de la camaronera ficticia "Acuícola Del Golfo S.A."
 
-Parte 1 (Paso 4.6a): genera los ciclos de cultivo LIMPIOS (la "verdad") con relaciones
-realistas y semilla fija. Se guardan en data/processed/farm_clean_truth.csv para medir,
-en la Fase 6, qué tan bien la limpieza recupera los valores reales.
-Parte 2 (Paso 4.6b): inyectará problemas de calidad y cargará a bronze.farm_raw.
-
-Grano: una fila = un ciclo de cultivo de una piscina (siembra → cosecha → venta).
-
-IMPORTANTE: todos los valores de PARAMS son SUPUESTOS de simulación (no datos reales),
-elegidos para producir órdenes de magnitud verosímiles. Solo el precio mensual de
-exportación es real (sale de bronze.comtrade_raw).
-"""
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
 
+from src.audit import compute_record_hash, make_batch_id
 from src.config import ROOT_DIR, project
-from src.db import read_sql
+from src.db import read_sql, write_df
 
 logger = logging.getLogger(__name__)
 
 TRUTH_PATH = ROOT_DIR / "data" / "processed" / "farm_clean_truth.csv"
+ISSUES_PATH = ROOT_DIR / "data" / "processed" / "farm_injected_issues.csv"
+RAW_DIR = ROOT_DIR / "data" / "raw" / "simulacion"
+SOURCE_NAME = "Simulación Acuícola Del Golfo"
 LB_PER_KG = project.kg_to_lb          # 2.20462
 
 # ------------------------------------------------------------------ supuestos de simulación
@@ -128,7 +119,7 @@ def size_grade_for(weight_g: float) -> tuple[str, float]:
     return SIZE_GRADES[0][0], SIZE_GRADES[0][3]
 
 
-# ------------------------------------------------------------------ generación
+# ------------------------------------------------------------------ Parte 1: datos limpios
 def generate_clean(prices: pd.Series, seed: int = project.random_seed) -> pd.DataFrame:
     """Genera los ciclos limpios: fincas → piscinas → ciclos hasta la última cosecha."""
     rng = np.random.default_rng(seed)
@@ -247,15 +238,186 @@ def summarize(df: pd.DataFrame) -> None:
     print(f"Correlación FCR ↔ costo por libra : {corr_fc:+.2f}  (esperado: positiva)")
 
 
-# Ejecutar: python -m src.simulate_farm   (no escribe en la base; solo el CSV de verdad)
+# ------------------------------------------------------------------ Parte 2: problemas de calidad
+# Proporción de filas (o de celdas) afectadas por cada problema (supuestos de simulación)
+ISSUE_RATES = {
+    "talla_formato": 0.30,      # '20/30' → '20-30' / '20 30'
+    "unidad_kg": 0.15,          # cantidad expresada en kg en vez de lb
+    "fecha_formato": 0.25,      # por cada columna de fecha
+    "coma_decimal": 0.10,       # por cada columna numérica con decimales
+    "nulo": 0.02,               # por cada columna no crítica
+    "fcr_outlier": 0.01,        # FCR = 0 o 15
+    "pais_variante_usa": 0.40,  # de las filas con 'Estados Unidos'
+    "pais_variante_china": 0.10,
+    "duplicado": 0.03,          # filas repetidas exactamente
+}
+DATE_COLS = ["stocking_date", "harvest_date"]
+# Formatos alternativos: TODOS con el día antes que el mes (convención ecuatoriana),
+# para que la limpieza tenga una regla clara y no haya fechas ambiguas.
+DATE_FORMATS = ["%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"]
+DECIMAL_COLS = ["pond_area_ha", "avg_weight_g", "sale_price_usd_lb"]
+NULLABLE_COLS = ["density_pl_m2", "survival_pct", "avg_weight_g",
+                 "cost_energy_usd", "destination_market"]
+USA_VARIANTS = ["EEUU", "USA", "U.S.A.", "usa ", "Estados Unidos de América"]
+CHINA_VARIANTS = ["china", "CHINA", "China "]
+CONTENT_COLS = [
+    "farm_name", "province", "pond_code", "pond_area_ha", "cycle_code", "stocking_date",
+    "harvest_date", "days_of_culture", "density_pl_m2", "survival_pct", "avg_weight_g",
+    "size_grade", "harvested_qty", "harvested_unit", "feed_kg", "fcr", "cost_larvae_usd",
+    "cost_feed_usd", "cost_energy_usd", "cost_labor_usd", "sale_price_usd_lb",
+    "destination_market",
+]
+
+
+def _to_text(value) -> str | None:
+    """Texto canónico: fechas ISO, enteros sin '.0', decimales con punto."""
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return None
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, (float, np.floating)) and float(value).is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def inject_issues(clean: pd.DataFrame,
+                  seed: int = project.random_seed) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Copia los datos limpios a TEXTO y los ensucia con problemas típicos.
+    Cada celda modificada queda en la bitácora (ciclo, columna, problema, original, sucio).
+    Una celda nunca recibe dos problemas (así la bitácora es exacta).
+    Devuelve (datos_sucios, bitacora).
+    """
+    rng = np.random.default_rng(seed + 1)      # semilla distinta a la Parte 1
+    dirty = clean[CONTENT_COLS].map(_to_text).astype(object)
+    touched: set[tuple[int, str]] = set()      # celdas ya modificadas
+    log: list[dict] = []
+
+    def pick(column: str, rate: float, mask: pd.Series | None = None) -> list[int]:
+        """Elige al azar filas elegibles (no tocadas en esa columna y no nulas)."""
+        ok = dirty[column].notna()
+        if mask is not None:
+            ok &= mask
+        candidates = [i for i in dirty.index[ok] if (i, column) not in touched]
+        n = int(round(len(candidates) * rate))
+        return sorted(rng.choice(candidates, size=n, replace=False).tolist()) if n else []
+
+    def change(i: int, column: str, issue: str, new) -> None:
+        log.append({"cycle_code": dirty.at[i, "cycle_code"], "column": column,
+                    "issue": issue, "original": dirty.at[i, column], "dirty": new})
+        dirty.at[i, column] = new
+        touched.add((i, column))
+
+    # 1) Tallas escritas de otra forma
+    for i in pick("size_grade", ISSUE_RATES["talla_formato"]):
+        sep = str(rng.choice(["-", " "]))
+        change(i, "size_grade", "talla_formato", dirty.at[i, "size_grade"].replace("/", sep))
+
+    # 2) Cantidad en kg en vez de lb (la unidad cambia en la misma fila)
+    for i in pick("harvested_qty", ISSUE_RATES["unidad_kg"]):
+        kg = round(float(dirty.at[i, "harvested_qty"]) / LB_PER_KG)
+        change(i, "harvested_qty", "unidad_kg", str(kg))
+        change(i, "harvested_unit", "unidad_kg", "kg")
+
+    # 3) Fechas en otros formatos
+    for column in DATE_COLS:
+        for i in pick(column, ISSUE_RATES["fecha_formato"]):
+            d = date.fromisoformat(dirty.at[i, column])
+            change(i, column, "fecha_formato", d.strftime(str(rng.choice(DATE_FORMATS))))
+
+    # 4) Coma decimal
+    for column in DECIMAL_COLS:
+        has_point = dirty[column].fillna("").str.contains(".", regex=False)
+        for i in pick(column, ISSUE_RATES["coma_decimal"], has_point):
+            change(i, column, "coma_decimal", dirty.at[i, column].replace(".", ","))
+
+    # 5) FCR imposibles (0 o 15)
+    for i in pick("fcr", ISSUE_RATES["fcr_outlier"]):
+        change(i, "fcr", "fcr_outlier", str(rng.choice(["0", "15"])))
+
+    # 6) Países escritos de varias formas
+    for name, variants, key in [("Estados Unidos", USA_VARIANTS, "pais_variante_usa"),
+                                ("China", CHINA_VARIANTS, "pais_variante_china")]:
+        for i in pick("destination_market", ISSUE_RATES[key],
+                      dirty["destination_market"] == name):
+            change(i, "destination_market", key, str(rng.choice(variants)))
+
+    # 7) Nulos en columnas no críticas
+    for column in NULLABLE_COLS:
+        for i in pick(column, ISSUE_RATES["nulo"]):
+            change(i, column, "nulo", None)
+
+    # 8) Duplicados exactos (se copian filas ya "sucias"), luego se baraja el orden
+    n_dup = int(round(len(dirty) * ISSUE_RATES["duplicado"]))
+    dup_idx = sorted(rng.choice(dirty.index, size=n_dup, replace=False).tolist())
+    for i in dup_idx:
+        log.append({"cycle_code": dirty.at[i, "cycle_code"], "column": "(fila completa)",
+                    "issue": "duplicado", "original": None, "dirty": None})
+    dirty = pd.concat([dirty, dirty.loc[dup_idx]], ignore_index=True)
+    dirty = dirty.iloc[rng.permutation(len(dirty))].reset_index(drop=True)
+
+    issues = pd.DataFrame(log)
+    logger.info("Problemas inyectados: %s cambios en %s filas (%s duplicados)",
+                len(issues), len(dirty), n_dup)
+    return dirty, issues
+
+
+def load_to_bronze(dirty: pd.DataFrame) -> int:
+    """
+    Carga los datos sucios a bronze.farm_raw. La huella incluye la POSICIÓN de la fila
+    en el archivo generado: así los duplicados exactos (problema a detectar en silver)
+    llegan a bronze, y la carga sigue siendo idempotente (misma semilla → mismas huellas).
+    """
+    df = dirty.copy()
+    df["source_row"] = range(1, len(df) + 1)
+    df["record_hash"] = compute_record_hash(df, CONTENT_COLS + ["source_row"])
+    df = df.drop(columns="source_row")
+    df["source_name"] = SOURCE_NAME
+    df["batch_id"] = make_batch_id("farm-sim")
+    df["extracted_at"] = datetime.now()
+
+    known = set(read_sql("SELECT record_hash FROM bronze.farm_raw")["record_hash"])
+    new = df[~df["record_hash"].isin(known)]
+    if len(df) - len(new):
+        logger.info("Simulación: %s filas ya existían en bronze, se omiten", len(df) - len(new))
+    if new.empty:
+        logger.info("Simulación: no hay filas nuevas que cargar")
+        return 0
+    write_df(new, "bronze", "farm_raw")
+    return len(new)
+
+
+def save_csv(df: pd.DataFrame, path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False, encoding="utf-8")
+    logger.info("Guardado %s", path.relative_to(ROOT_DIR))
+
+
+# Ejecutar: python -m src.simulate_farm
 if __name__ == "__main__":
     from src.logging_config import setup_logging
 
     setup_logging()
+
+    # Parte 1: datos limpios (verdad de referencia)
     prices = load_monthly_price()
     clean = generate_clean(prices)
     summarize(clean)
+    save_csv(clean, TRUTH_PATH)
 
-    TRUTH_PATH.parent.mkdir(parents=True, exist_ok=True)
-    clean.to_csv(TRUTH_PATH, index=False, encoding="utf-8")
-    logger.info("Verdad de referencia guardada en %s", TRUTH_PATH.relative_to(ROOT_DIR))
+    # Parte 2: problemas de calidad documentados → archivo crudo → bronze
+    dirty, issues = inject_issues(clean)
+    save_csv(issues, ISSUES_PATH)
+    stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    save_csv(dirty, RAW_DIR / f"farm_raw_seed{project.random_seed}_{stamp}.csv")
+    n_new = load_to_bronze(dirty)
+
+    print("\nProblemas inyectados (celdas afectadas por tipo):")
+    print(issues["issue"].value_counts().to_string())
+    print("\nEjemplos de valores sucios:")
+    print(issues.dropna(subset=["dirty"]).groupby("issue").head(1)
+          [["issue", "column", "original", "dirty"]].to_string(index=False))
+
+    total = read_sql("SELECT COUNT(*) AS n FROM bronze.farm_raw")["n"].iloc[0]
+    print(f"\nFilas generadas: {len(dirty)} (limpias {len(clean)} + duplicados "
+          f"{len(dirty) - len(clean)}) | nuevas en bronze: {n_new} | total en bronze: {total}")
