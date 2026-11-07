@@ -1,6 +1,22 @@
+"""
+extract_comtrade.py — Extracción de exportaciones de camarón de Ecuador desde UN Comtrade.
 
+Dos modos (misma tabla bronze.comtrade_raw, distinguidos por flow_code y source_name):
+  export  → lo que ECUADOR reporta como exportado (flow X, reporter 218, todos los destinos)
+  mirror  → lo que el RESTO DEL MUNDO reporta como importado desde Ecuador
+            (flow M, todos los reporters, partner 218). Valores CIF.
+
+Hallazgo documentado: Comtrade no tiene publicados de Ecuador Feb 2022–Dic 2023,
+Abr 2024 ni 2025. El espejo cubre el detalle por país de esos meses; el total
+nacional oficial viene del BCE (extract_bce.py).
+
+Uso:
+    python -m src.extract_comtrade            # exportaciones de Ecuador
+    python -m src.extract_comtrade --mirror   # estadísticas espejo
+"""
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import time
@@ -19,12 +35,31 @@ logger = logging.getLogger(__name__)
 # Carpeta de respuestas crudas de Comtrade (evidencia de lo que devolvió la API)
 RAW_DIR = ROOT_DIR / "data" / "raw" / "comtrade"
 
-SOURCE_NAME = "UN Comtrade"
-FLOW_EXPORT = "X"          # X = exportaciones en Comtrade
+ECUADOR = str(project.reporter_code)   # '218'
 WORLD_PARTNER_CODE = 0     # partnerCode 0 = "World" (total mundial, NO es un país)
 START_YEAR = 2018          # desde 2018 para poder calcular YoY de 2019
 PAUSE_SECONDS = 2          # pausa entre llamadas (límite de la API)
 MAX_RETRIES = 3
+
+# Qué cambia entre los dos modos de consulta
+MODES = {
+    "export": {
+        "flow": "X",                      # exportaciones
+        "reporter": ECUADOR,              # quien reporta: Ecuador
+        "partner": None,                  # hacia: todos los países
+        "source_name": "UN Comtrade",
+        "file_tag": "X",
+        "batch_prefix": "comtrade",
+    },
+    "mirror": {
+        "flow": "M",                      # importaciones
+        "reporter": None,                 # quien reporta: todos los países
+        "partner": ECUADOR,               # desde: Ecuador
+        "source_name": "UN Comtrade (espejo)",
+        "file_tag": "M_espejo",
+        "batch_prefix": "comtrade-m",
+    },
+}
 
 # Columna de la API → columna de bronze.comtrade_raw (todas se guardan como texto)
 COLUMN_MAP = {
@@ -58,7 +93,7 @@ def get_availability(freq: str = "M") -> pd.DataFrame:
         freqCode=freq,
         clCode="HS",
         period=None,                           # None = todos los períodos
-        reporterCode=str(project.reporter_code),
+        reporterCode=ECUADOR,
     )
     if df is None:
         raise RuntimeError("Comtrade no respondió la consulta de disponibilidad "
@@ -81,9 +116,10 @@ def get_availability(freq: str = "M") -> pd.DataFrame:
     return out
 
 
-def fetch_comtrade(period: str) -> pd.DataFrame:
-    """Una llamada a la API: exportaciones mensuales de Ecuador para 'period'
-    (uno o varios meses separados por coma, máximo 12)."""
+def fetch_comtrade(period: str, mode: str = "export") -> pd.DataFrame:
+    """Una llamada a la API para 'period' (uno o varios meses separados por coma,
+    máximo 12) en el modo indicado ('export' o 'mirror')."""
+    cfg = MODES[mode]
     key = settings.require_comtrade_key()   # falla con mensaje claro si falta en .env
 
     start = time.perf_counter()
@@ -93,10 +129,10 @@ def fetch_comtrade(period: str) -> pd.DataFrame:
         freqCode="M",                          # M = mensual
         clCode="HS",                           # clasificación Sistema Armonizado
         period=period,
-        reporterCode=str(project.reporter_code),
+        reporterCode=cfg["reporter"],
         cmdCode=",".join(project.hs_codes),    # '030617,160521,160529'
-        flowCode=FLOW_EXPORT,
-        partnerCode=None,                      # None = todos los países destino
+        flowCode=cfg["flow"],
+        partnerCode=cfg["partner"],
         partner2Code=None,
         customsCode=None,
         motCode=None,
@@ -111,47 +147,52 @@ def fetch_comtrade(period: str) -> pd.DataFrame:
 
     # La librería NO lanza excepción si la API falla: devuelve None.
     if df is None:
-        raise RuntimeError(f"Comtrade no devolvió datos para period={period}")
+        raise RuntimeError(f"Comtrade no devolvió datos para period={period} (modo {mode})")
+    n_months = len(period.split(","))
     if df.empty:
-        logger.warning("Comtrade: 0 filas para period=%s en %.1f s", period, elapsed)
+        logger.warning("Comtrade [%s]: 0 filas para %s mes(es) en %.1f s",
+                       mode, n_months, elapsed)
     else:
-        logger.info("Comtrade: %s filas para %s mes(es) en %.1f s",
-                    len(df), len(period.split(",")), elapsed)
+        logger.info("Comtrade [%s]: %s filas para %s mes(es) en %.1f s",
+                    mode, len(df), n_months, elapsed)
     return df
 
 
-def fetch_with_retry(period: str) -> pd.DataFrame:
+def fetch_with_retry(period: str, mode: str = "export") -> pd.DataFrame:
     """fetch_comtrade con reintentos y espera creciente (5 s, 10 s, 15 s)."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return fetch_comtrade(period)
+            return fetch_comtrade(period, mode)
         except RuntimeError:
             if attempt == MAX_RETRIES:
-                logger.error("Comtrade: %s intentos fallidos para %s", MAX_RETRIES, period)
+                logger.error("Comtrade [%s]: %s intentos fallidos para %s",
+                             mode, MAX_RETRIES, period)
                 raise
             wait = 5 * attempt
-            logger.warning("Comtrade: intento %s falló, reintento en %s s", attempt, wait)
+            logger.warning("Comtrade [%s]: intento %s falló, reintento en %s s",
+                           mode, attempt, wait)
             time.sleep(wait)
     raise AssertionError("inalcanzable")
 
 
 # --------------------------------------------------------------------------- archivos
-def save_raw(df: pd.DataFrame, period_label: str) -> Path | None:
+def save_raw(df: pd.DataFrame, period_label: str, mode: str = "export") -> Path | None:
     """Guarda la respuesta tal cual (nunca sobrescribe: el nombre lleva fecha/hora).
     Una respuesta vacía no se guarda."""
     if df.empty:
-        logger.warning("Respuesta vacía para %s: no se guarda archivo", period_label)
+        logger.warning("Respuesta vacía para %s (%s): no se guarda archivo", period_label, mode)
         return None
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-    path = RAW_DIR / f"comtrade_{project.reporter_code}_{FLOW_EXPORT}_{period_label}_{stamp}.csv"
+    tag = MODES[mode]["file_tag"]
+    path = RAW_DIR / f"comtrade_{ECUADOR}_{tag}_{period_label}_{stamp}.csv"
     df.to_csv(path, index=False, encoding="utf-8")
     logger.info("Respuesta cruda guardada en %s", path.relative_to(ROOT_DIR))
     return path
 
 
 # --------------------------------------------------------------------------- bronze
-def to_bronze(df: pd.DataFrame, batch_id: str) -> pd.DataFrame:
+def to_bronze(df: pd.DataFrame, batch_id: str, source_name: str) -> pd.DataFrame:
     """Convierte la respuesta de la API al formato de bronze.comtrade_raw:
     campos rápidos como texto + fila completa en raw_payload (JSON) + auditoría."""
     # to_json convierte NaN → null y tipos de numpy → JSON válido (MySQL rechaza NaN)
@@ -167,7 +208,7 @@ def to_bronze(df: pd.DataFrame, batch_id: str) -> pd.DataFrame:
 
     out = pd.DataFrame(rows)
     out["record_hash"] = compute_record_hash(out, ["raw_payload"])
-    out["source_name"] = SOURCE_NAME
+    out["source_name"] = source_name
     out["batch_id"] = batch_id
     out["extracted_at"] = datetime.now()
     return out
@@ -179,73 +220,140 @@ def existing_hashes() -> set[str]:
     return set(read_sql("SELECT record_hash FROM bronze.comtrade_raw")["record_hash"])
 
 
+def expected_periods(start_year: int, last_period: str) -> list[str]:
+    """Todos los meses AAAAMM desde enero de start_year hasta last_period (incluido)."""
+    return [
+        f"{y}{m:02d}"
+        for y in range(start_year, int(last_period[:4]) + 1)
+        for m in range(1, 13)
+        if f"{y}{m:02d}" <= last_period
+    ]
+
+
 def missing_periods(published: list[str], start_year: int = START_YEAR) -> list[str]:
     """Meses esperados (desde start_year hasta el último publicado) que NO están publicados."""
-    last = max(published)
-    expected = [
-        f"{y}{m:02d}"
-        for y in range(start_year, int(last[:4]) + 1)
-        for m in range(1, 13)
-        if f"{y}{m:02d}" <= last
-    ]
-    return [p for p in expected if p not in set(published)]
+    published_set = set(published)
+    return [p for p in expected_periods(start_year, max(published)) if p not in published_set]
 
 
-def load_comtrade(start_year: int = START_YEAR) -> None:
-    """Descarga y carga a bronze todos los meses publicados desde start_year."""
-    available = get_availability("M")
-    published = [p for p in available["period"] if p >= f"{start_year}01"]
-
-    by_year: dict[str, list[str]] = {}
-    for p in published:
-        by_year.setdefault(p[:4], []).append(p)
-
+def _load_years(by_year: dict[str, list[str]], mode: str) -> int:
+    """Descarga año por año (≤ 12 meses por llamada) y carga a bronze solo lo nuevo.
+    Devuelve el número de filas nuevas cargadas."""
+    cfg = MODES[mode]
     known = existing_hashes()
     total_new = 0
 
     for i, (year, periods) in enumerate(sorted(by_year.items())):
         if i > 0:
             time.sleep(PAUSE_SECONDS)
-        df = fetch_with_retry(",".join(periods))      # ≤ 12 meses por llamada
-        save_raw(df, year)
+        df = fetch_with_retry(",".join(periods), mode)
+        save_raw(df, year, mode)
         if df.empty:
             continue
 
-        batch = to_bronze(df, make_batch_id("comtrade"))
+        batch = to_bronze(df, make_batch_id(cfg["batch_prefix"]), cfg["source_name"])
         new = batch[~batch["record_hash"].isin(known)]
         skipped = len(batch) - len(new)
         if skipped:
-            logger.info("Comtrade %s: %s filas ya existían en bronze, se omiten", year, skipped)
+            logger.info("Comtrade [%s] %s: %s filas ya existían en bronze, se omiten",
+                        mode, year, skipped)
         if not new.empty:
             write_df(new, "bronze", "comtrade_raw", dedupe_on=["record_hash"])
             known.update(new["record_hash"])
             total_new += len(new)
 
-    logger.info("Comtrade: carga terminada | %s filas nuevas en total", total_new)
+    logger.info("Comtrade [%s]: carga terminada | %s filas nuevas en total", mode, total_new)
+    return total_new
+
+
+def load_comtrade(start_year: int = START_YEAR) -> None:
+    """Exportaciones reportadas por Ecuador: solo los meses que Comtrade tiene publicados."""
+    available = get_availability("M")
+    published = [p for p in available["period"] if p >= f"{start_year}01"]
+
+    by_year: dict[str, list[str]] = {}
+    for p in published:
+        by_year.setdefault(p[:4], []).append(p)
+    _load_years(by_year, "export")
 
     gaps = missing_periods(list(available["period"]), start_year)
     if gaps:
-        logger.warning("Comtrade: %s meses NO publicados desde %s: %s",
+        logger.warning("Comtrade: %s meses NO publicados por Ecuador desde %s: %s",
                        len(gaps), start_year, ", ".join(gaps))
 
 
-# Ejecutar: python -m src.extract_comtrade   (≈ 1 + 1 llamada por año)
+def load_comtrade_mirror(start_year: int = START_YEAR) -> None:
+    """Estadísticas espejo: todos los meses desde start_year hasta el mes anterior al actual
+    (los meses que ningún país publicó todavía simplemente vuelven vacíos)."""
+    today = datetime.now()
+    last_year, last_month = (today.year, today.month - 1) if today.month > 1 \
+        else (today.year - 1, 12)
+    last_period = f"{last_year}{last_month:02d}"
+
+    by_year: dict[str, list[str]] = {}
+    for p in expected_periods(start_year, last_period):
+        by_year.setdefault(p[:4], []).append(p)
+    _load_years(by_year, "mirror")
+
+
+# --------------------------------------------------------------------------- reportes
+def print_coverage(flow: str) -> None:
+    """Cobertura por año leída desde la BASE para un flujo ('X' o 'M')."""
+    coverage = read_sql(
+        """
+        SELECT LEFT(period, 4)               AS anio,
+               COUNT(DISTINCT period)        AS meses,
+               COUNT(DISTINCT reporter_code) AS reportadores,
+               COUNT(DISTINCT partner_code)  AS socios,
+               COUNT(*)                      AS filas
+        FROM bronze.comtrade_raw
+        WHERE flow_code = :f
+        GROUP BY LEFT(period, 4)
+        ORDER BY anio
+        """,
+        {"f": flow},
+    )
+    title = "exportaciones de Ecuador (X)" if flow == "X" else "espejo (M)"
+    print(f"\nCobertura en bronze — {title}:")
+    print(coverage.to_string(index=False))
+
+
+def print_gap_coverage(start_year: int = START_YEAR) -> None:
+    """¿Qué meses sin dato de Ecuador (X) quedan cubiertos por el espejo (M)?"""
+    periods = read_sql(
+        "SELECT DISTINCT flow_code, period FROM bronze.comtrade_raw WHERE flow_code IN ('X','M')"
+    )
+    x = set(periods.loc[periods["flow_code"] == "X", "period"])
+    m = set(periods.loc[periods["flow_code"] == "M", "period"])
+    if not m:
+        print("\nAún no hay datos espejo en bronze.")
+        return
+
+    gaps = [p for p in expected_periods(start_year, max(m | x)) if p not in x]
+    covered = [p for p in gaps if p in m]
+    uncovered = [p for p in gaps if p not in m]
+    print(f"\nMeses sin dato de Ecuador desde {start_year}: {len(gaps)}")
+    print(f"  cubiertos por el espejo : {len(covered)}")
+    print(f"  sin cubrir              : {len(uncovered)} "
+          f"{'→ ' + ', '.join(uncovered) if uncovered else ''}")
+
+
+# Ejecutar:
+#   python -m src.extract_comtrade            (≈ 1 + 1 llamada por año)
+#   python -m src.extract_comtrade --mirror   (≈ 1 llamada por año)
 if __name__ == "__main__":
     from src.logging_config import setup_logging
 
-    setup_logging()
-    load_comtrade()
+    parser = argparse.ArgumentParser(description="Extracción de UN Comtrade a bronze")
+    parser.add_argument("--mirror", action="store_true",
+                        help="estadísticas espejo (importaciones de otros países desde Ecuador)")
+    args = parser.parse_args()
 
-    # Cobertura por año, leída desde la BASE
-    coverage = read_sql(
-        """
-        SELECT LEFT(period, 4)        AS anio,
-               COUNT(DISTINCT period) AS meses,
-               COUNT(*)               AS filas
-        FROM bronze.comtrade_raw
-        GROUP BY LEFT(period, 4)
-        ORDER BY anio
-        """
-    )
-    print("\nCobertura de Comtrade en bronze (meses con datos por año):")
-    print(coverage.to_string(index=False))
+    setup_logging()
+    if args.mirror:
+        load_comtrade_mirror()
+        print_coverage("M")
+        print_gap_coverage()
+    else:
+        load_comtrade()
+        print_coverage("X")
