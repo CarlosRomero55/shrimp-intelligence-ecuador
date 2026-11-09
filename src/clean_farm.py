@@ -1,11 +1,11 @@
 """
 clean_farm.py — Limpieza de la finca simulada: bronze.farm_raw → tablas de silver.
 
-Paso 5.6: farms y ponds.  (5.7: production_cycles y harvests · 5.8: cycle_costs y sales.)
+Paso 5.6: farms y ponds · Paso 5.7: production_cycles y harvests · (5.8: cycle_costs y sales).
 
 Principio (ADR-002): silver guarda solo hechos MEDIDOS. Los ratios que trae bronze
 (fcr, survival_pct, density_pl_m2) no se guardan; gold los recalcula. Los datos que
-bronze trae "calculados" sirven para VERIFICAR la limpieza.
+bronze trae "calculados" (days_of_culture, fcr) sirven para VERIFICAR la limpieza.
 
 Política de nulos en columnas obligatorias (decisión del 2026-11-09): IMPUTAR y MARCAR.
 Cada imputación queda contada en el registro de reglas y se compara con la verdad
@@ -16,19 +16,28 @@ Ejecutar: python -m src.clean_farm
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 
+import numpy as np
 import pandas as pd
 
+from src.catalogs import normalize_size
 from src.clean_exports import RuleLog
-from src.config import ROOT_DIR
+from src.config import ROOT_DIR, project
 from src.db import read_sql, upsert
-from src.simulate_farm import SOURCE_NAME, TRUTH_PATH
+from src.simulate_farm import CONTENT_COLS, SOURCE_NAME, TRUTH_PATH
 
 logger = logging.getLogger(__name__)
 
 QUALITY_PATH = ROOT_DIR / "data" / "processed" / "quality_farm.csv"
+VERIFY_PATH = ROOT_DIR / "data" / "processed" / "farm_verification.csv"
 FARM_CODE_PREFIX = "ADG"                      # Acuícola Del Golfo
 VALID_PROVINCES = {"Guayas", "El Oro", "Santa Elena", "Esmeraldas", "Manabí"}  # chk_farms_province
+LB_PER_KG = project.kg_to_lb                  # 2.20462
+# Formatos de fecha aceptados. Regla del proyecto: el DÍA va antes que el MES.
+DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y"]
+FCR_TOLERANCE = 0.15                          # 15 %: FCR reportado vs alimento ÷ cosecha
+MAX_WEIGHT_G = 60                             # regla chk_harvests_weight
 
 # Lote vigente: la simulación se carga completa en cada lote, así que se usa SOLO el más
 # reciente. DENSE_RANK() es otra window function: da el MISMO número a todas las filas que
@@ -55,6 +64,19 @@ def parse_decimal(text) -> float | None:
         return None
 
 
+def parse_date(text) -> tuple[date | None, str | None]:
+    """Prueba los formatos aceptados; devuelve (fecha, formato usado) o (None, None)."""
+    if text is None or pd.isna(text):
+        return None, None
+    value = str(text).strip()
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(value, fmt).date(), fmt
+        except ValueError:
+            continue
+    return None, None
+
+
 def mode_or_first(series: pd.Series):
     """Valor más frecuente (si empatan, el primero en aparecer)."""
     counts = series.dropna().value_counts()
@@ -70,7 +92,7 @@ def read_bronze_farm(log: RuleLog) -> pd.DataFrame:
     return df
 
 
-# ------------------------------------------------------------------ farms
+# ------------------------------------------------------------------ 5.6 farms
 def clean_farms(raw: pd.DataFrame, log: RuleLog) -> pd.DataFrame:
     """Una fila por finca. Código = prefijo de la piscina (GY-P01 → ADG-GY)."""
     df = raw.assign(prefix=raw["pond_code"].str.split("-").str[0].str.strip().str.upper())
@@ -95,7 +117,7 @@ def clean_farms(raw: pd.DataFrame, log: RuleLog) -> pd.DataFrame:
     return farms[["farm_code", "farm_name", "province"]]
 
 
-# ------------------------------------------------------------------ ponds
+# ------------------------------------------------------------------ 5.6 ponds
 def clean_ponds(raw: pd.DataFrame, log: RuleLog, farm_ids: dict[str, int]) -> pd.DataFrame:
     """Una fila por piscina, con su área limpia y consistente entre ciclos."""
     df = raw.assign(
@@ -131,7 +153,154 @@ def clean_ponds(raw: pd.DataFrame, log: RuleLog, farm_ids: dict[str, int]) -> pd
     return ponds[["farm_id", "pond_code", "area_ha"]]
 
 
-# ------------------------------------------------------------------ verificación
+# ------------------------------------------------------------------ 5.7 ciclos y cosechas
+def clean_cycles(raw: pd.DataFrame, log: RuleLog, ponds: pd.DataFrame,
+                 sizes: pd.DataFrame) -> pd.DataFrame:
+    """
+    Una fila por ciclo, con todo lo necesario para production_cycles y harvests
+    (y, en el paso 5.8, para costos y ventas). Columnas *_imputed marcan valores estimados.
+    """
+    df = raw.copy()
+
+    # --- Duplicados: primero copias exactas, luego códigos de ciclo repetidos con datos distintos
+    exact = df.duplicated(subset=CONTENT_COLS, keep="first")
+    log.add("duplicado_exacto", exact.sum(), "excluidas", "filas idénticas en todo su contenido")
+    df = df[~exact]
+    df["cycle_code"] = df["cycle_code"].str.strip().str.upper()
+    conflict = df.duplicated(subset="cycle_code", keep="first")
+    log.add("ciclo_repetido_con_cambios", conflict.sum(), "se conserva la primera",
+            ", ".join(df.loc[conflict, "cycle_code"]))
+    df = df[~conflict]
+
+    # --- Fechas en varios formatos (el día siempre antes que el mes)
+    for col, new in [("stocking_date", "stocking"), ("harvest_date", "harvest")]:
+        parsed = df[col].map(parse_date)
+        df[new] = parsed.str[0]
+        fmt = parsed.str[1]
+        log.add(f"fecha_formato_{new}", (fmt.notna() & (fmt != DATE_FORMATS[0])).sum(),
+                "convertidas", "formato distinto de AAAA-MM-DD")
+    bad_date = df["stocking"].isna() | df["harvest"].isna()
+    log.add("fecha_invalida", bad_date.sum(), "excluidas", "no coincide con ningún formato")
+    df = df[~bad_date]
+    bad_order = df["harvest"] <= df["stocking"]
+    log.add("fecha_cosecha_antes_siembra", bad_order.sum(), "excluidas", "regla chk_cycles_dates")
+    df = df[~bad_order]
+
+    # --- Verificación: días calculados desde las fechas limpias vs. lo que reporta bronze
+    computed_days = (pd.to_datetime(df["harvest"]) - pd.to_datetime(df["stocking"])).dt.days
+    reported_days = pd.to_numeric(df["days_of_culture"], errors="coerce")
+    mismatch = reported_days.notna() & (computed_days != reported_days)
+    log.add("validar_dias_cultivo", mismatch.sum(), "solo reporte",
+            "días desde fechas limpias ≠ days_of_culture de bronze")
+
+    # --- Piscina
+    df["pond_code"] = df["pond_code"].str.strip().str.upper()
+    df = df.merge(ponds[["pond_code", "pond_id", "area_ha"]], on="pond_code", how="left")
+    no_pond = df["pond_id"].isna()
+    log.add("ciclo_sin_piscina", no_pond.sum(), "excluidas", "piscina no cargada en silver")
+    df = df[~no_pond]
+
+    # --- Cosecha: todo a kg (las libras las genera MySQL)
+    qty = df["harvested_qty"].map(parse_decimal)
+    unit = df["harvested_unit"].fillna("").str.strip().str.lower()
+    df["harvested_kg"] = np.where(unit == "lb", qty / LB_PER_KG,
+                                  np.where(unit == "kg", qty, np.nan))
+    log.add("unidad_kg", (unit == "kg").sum(), "se conservan en kg", "las demás: lb ÷ 2,20462")
+    bad_qty = df["harvested_kg"].isna() | (df["harvested_kg"] <= 0)
+    log.add("cosecha_invalida", bad_qty.sum(), "excluidas", "cantidad o unidad no válida")
+    df = df[~bad_qty]
+
+    # --- Talla
+    df["size_code"] = df["size_grade"].map(normalize_size)
+    changed = df["size_code"].notna() & (df["size_code"] != df["size_grade"])
+    log.add("talla_formato", changed.sum(), "normalizadas", "'20-30' / '20 30' → '20/30'")
+    df = df.merge(sizes, on="size_code", how="left")
+    no_size = df["size_id"].isna()
+    log.add("talla_desconocida", no_size.sum(), "excluidas", "talla fuera del catálogo")
+    df = df[~no_size]
+
+    # --- Números con coma decimal y campos de apoyo (no se guardan en silver)
+    for col in ["avg_weight_g", "density_pl_m2", "survival_pct", "feed_kg", "fcr"]:
+        commas = df[col].fillna("").astype(str).str.contains(",", regex=False)
+        if commas.any():
+            log.add(f"coma_decimal_{col}", commas.sum(), "corregidas", "',' → '.'")
+        df[col + "_num"] = df[col].map(parse_decimal)
+
+    # --- Larvas sembradas (dato obligatorio): medido = densidad × área × 10.000
+    df["larvae"] = df["density_pl_m2_num"] * df["area_ha"] * 10_000
+    df["larvae_imputed"] = df["larvae"].isna()
+    # Imputación 1: despejar de la cosecha → piezas ÷ supervivencia
+    pieces = df["harvested_kg"] * 1000 / df["avg_weight_g_num"]
+    by_harvest = df["larvae"].isna() & pieces.notna() & df["survival_pct_num"].gt(0)
+    df.loc[by_harvest, "larvae"] = pieces[by_harvest] / (df.loc[by_harvest, "survival_pct_num"] / 100)
+    log.add("larvas_imputadas_por_cosecha", by_harvest.sum(), "imputadas",
+            "densidad nula: piezas cosechadas ÷ supervivencia")
+    # Imputación 2: densidad mediana de la finca
+    df["farm_prefix"] = df["pond_code"].str.split("-").str[0]
+    median_density = df.groupby("farm_prefix")["density_pl_m2_num"].transform("median")
+    by_median = df["larvae"].isna()
+    df.loc[by_median, "larvae"] = median_density[by_median] * df.loc[by_median, "area_ha"] * 10_000
+    log.add("larvas_imputadas_por_mediana", by_median.sum(), "imputadas",
+            "densidad y supervivencia nulas: densidad mediana de la finca")
+
+    # --- Peso promedio (dato obligatorio)
+    df["avg_weight"] = df["avg_weight_g_num"]
+    df["weight_imputed"] = df["avg_weight"].isna()
+    measured_larvae = ~df["larvae_imputed"]
+    by_biomass = df["avg_weight"].isna() & measured_larvae & df["survival_pct_num"].gt(0)
+    df.loc[by_biomass, "avg_weight"] = (
+        df.loc[by_biomass, "harvested_kg"] * 1000
+        / (df.loc[by_biomass, "larvae"] * df.loc[by_biomass, "survival_pct_num"] / 100))
+    log.add("peso_imputado_por_biomasa", by_biomass.sum(), "imputados",
+            "kg ÷ (larvas × supervivencia)")
+    by_size = df["avg_weight"].isna()
+    midpoint = 1000 / ((df["min_count"] + df["max_count"]) / 2)      # g por pieza
+    df.loc[by_size, "avg_weight"] = midpoint[by_size]
+    log.add("peso_imputado_por_talla", by_size.sum(), "imputados",
+            "punto medio de la talla (piezas por kg)")
+    bad_weight = (df["avg_weight"] <= 0) | (df["avg_weight"] > MAX_WEIGHT_G)
+    log.add("peso_fuera_de_rango", bad_weight.sum(), "excluidas", "regla chk_harvests_weight")
+    df = df[~bad_weight]
+
+    # --- Alimento (opcional en silver): negativo → vacío
+    neg_feed = df["feed_kg_num"] < 0
+    df.loc[neg_feed, "feed_kg_num"] = np.nan
+    log.add("alimento_negativo", neg_feed.sum(), "a NULL", "feed_kg < 0")
+
+    # --- Verificación: FCR reportado vs alimento ÷ cosecha (el FCR NO se guarda)
+    computed_fcr = df["feed_kg_num"] / df["harvested_kg"]
+    fcr_bad = (df["fcr_num"].notna() & computed_fcr.notna()
+               & ((df["fcr_num"] - computed_fcr).abs() > FCR_TOLERANCE * computed_fcr))
+    log.add("fcr_reportado_inconsistente", fcr_bad.sum(), "solo reporte (no se guarda FCR)",
+            ", ".join(df.loc[fcr_bad, "cycle_code"]))
+
+    log.add("ciclos_limpios", len(df), "carga", "production_cycles + harvests")
+    return df.reset_index(drop=True)
+
+
+def to_cycles_table(clean: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({
+        "pond_id": clean["pond_id"].astype(int),
+        "cycle_code": clean["cycle_code"],
+        "stocking_date": clean["stocking"],
+        "final_harvest_date": clean["harvest"],
+        "larvae_stocked": clean["larvae"].round().astype(int),
+        "feed_kg": clean["feed_kg_num"].round(2),
+    })
+
+
+def to_harvests_table(clean: pd.DataFrame, cycle_ids: dict[str, int]) -> pd.DataFrame:
+    return pd.DataFrame({
+        "cycle_id": clean["cycle_code"].map(cycle_ids).astype(int),
+        "harvest_date": clean["harvest"],
+        "harvest_type": "final",
+        "harvested_kg": clean["harvested_kg"].round(2),
+        "avg_weight_g": clean["avg_weight"].round(2),
+        "size_id": clean["size_id"].astype(int),
+    })
+
+
+# ------------------------------------------------------------------ verificación vs. verdad
 def verify_ponds_against_truth() -> tuple[int, int]:
     """Compara las áreas de silver con la verdad de la simulación (antes de ensuciar)."""
     truth = (pd.read_csv(TRUTH_PATH, usecols=["pond_code", "pond_area_ha"])
@@ -147,11 +316,57 @@ def verify_ponds_against_truth() -> tuple[int, int]:
     return int(ok.sum()), len(truth)
 
 
+def verify_cycles_against_truth(clean: pd.DataFrame) -> pd.DataFrame:
+    """Exactitud de la limpieza de ciclos y cosechas frente a farm_clean_truth.csv."""
+    truth = pd.read_csv(TRUTH_PATH)
+    t = truth.assign(
+        t_stocking=pd.to_datetime(truth["stocking_date"]).dt.date,
+        t_harvest=pd.to_datetime(truth["harvest_date"]).dt.date,
+        t_kg=truth["harvested_qty"] / LB_PER_KG,
+        t_larvae=truth["density_pl_m2"] * truth["pond_area_ha"] * 10_000,
+        t_weight=truth["avg_weight_g"],
+        t_feed=truth["feed_kg"],
+    )[["cycle_code", "t_stocking", "t_harvest", "t_kg", "t_larvae", "t_weight", "t_feed"]]
+    m = t.merge(clean, on="cycle_code", how="left")
+    found = m["harvest"].notna()
+
+    def pct_ok(mask: pd.Series, ok: pd.Series) -> str:
+        n = int(mask.sum())
+        return f"{int((ok & mask).sum())}/{n}" if n else "0/0"
+
+    def mean_err(mask: pd.Series, est: pd.Series, real: pd.Series) -> str:
+        n = int(mask.sum())
+        return f"{((est - real).abs() / real)[mask].mean() * 100:.1f} %" if n else "—"
+
+    rel = lambda a, b, tol: ((a - b).abs() / b) <= tol             # noqa: E731
+    measured_l = found & ~m["larvae_imputed"].fillna(True).astype(bool)
+    imputed_l = found & m["larvae_imputed"].fillna(False).astype(bool)
+    measured_w = found & ~m["weight_imputed"].fillna(True).astype(bool)
+    imputed_w = found & m["weight_imputed"].fillna(False).astype(bool)
+    has_feed = found & m["t_feed"].notna() & m["feed_kg_num"].notna()
+
+    rows = [
+        ("ciclos en silver", f"{int(found.sum())}/{len(t)}", "deben ser 510"),
+        ("fecha de siembra exacta", pct_ok(found, m["stocking"] == m["t_stocking"]), ""),
+        ("fecha de cosecha exacta", pct_ok(found, m["harvest"] == m["t_harvest"]), ""),
+        ("kg cosechados (±0,5 %)", pct_ok(found, rel(m["harvested_kg"], m["t_kg"], 0.005)), ""),
+        ("larvas medidas (±0,1 %)", pct_ok(measured_l, rel(m["larvae"], m["t_larvae"], 0.001)), ""),
+        ("larvas imputadas: error medio", mean_err(imputed_l, m["larvae"], m["t_larvae"]),
+         f"{int(imputed_l.sum())} imputadas"),
+        ("peso medido exacto", pct_ok(measured_w, (m["avg_weight"] - m["t_weight"]).abs() < 0.05), ""),
+        ("peso imputado: error medio", mean_err(imputed_w, m["avg_weight"], m["t_weight"]),
+         f"{int(imputed_w.sum())} imputados"),
+        ("alimento exacto", pct_ok(has_feed, (m["feed_kg_num"] - m["t_feed"]).abs() < 0.5), ""),
+    ]
+    return pd.DataFrame(rows, columns=["control", "resultado", "nota"])
+
+
 # ------------------------------------------------------------------ orquestación
-def run() -> pd.DataFrame:
+def run() -> tuple[pd.DataFrame, pd.DataFrame]:
     log = RuleLog()
     raw = read_bronze_farm(log)
 
+    # 5.6 fincas y piscinas
     farms = clean_farms(raw, log)
     upsert(farms, "silver", "farms", key_cols=["farm_code"])
     farm_ids = read_sql("SELECT farm_id, farm_code FROM silver.farms")
@@ -160,11 +375,33 @@ def run() -> pd.DataFrame:
     ponds = clean_ponds(raw, log, farm_ids)
     upsert(ponds, "silver", "ponds", key_cols=["farm_id", "pond_code"])
 
+    # 5.7 ciclos y cosechas
+    pond_map = read_sql(
+        "SELECT p.pond_id, p.pond_code, p.area_ha FROM silver.ponds AS p "
+        "JOIN silver.farms AS f ON f.farm_id = p.farm_id WHERE f.farm_code LIKE :prefix",
+        {"prefix": f"{FARM_CODE_PREFIX}-%"},
+    )
+    pond_map["area_ha"] = pond_map["area_ha"].astype(float)
+    sizes = read_sql("SELECT size_id, size_code, min_count, max_count FROM silver.sizes")
+
+    clean = clean_cycles(raw, log, pond_map, sizes)
+    # days_of_culture NO se envía: columna generada (final_harvest_date − stocking_date)
+    upsert(to_cycles_table(clean), "silver", "production_cycles", key_cols=["cycle_code"])
+
+    cycle_ids = read_sql("SELECT cycle_id, cycle_code FROM silver.production_cycles")
+    cycle_ids = dict(zip(cycle_ids["cycle_code"], cycle_ids["cycle_id"]))
+    # harvested_lb NO se envía: columna generada (harvested_kg × 2,20462)
+    upsert(to_harvests_table(clean, cycle_ids), "silver", "harvests",
+           key_cols=["cycle_id", "harvest_date"])
+
     rules = log.to_frame()
     QUALITY_PATH.parent.mkdir(parents=True, exist_ok=True)
     rules.to_csv(QUALITY_PATH, index=False, encoding="utf-8")
     logger.info("Registro de reglas guardado en %s", QUALITY_PATH.relative_to(ROOT_DIR))
-    return rules
+
+    verification = verify_cycles_against_truth(clean)
+    verification.to_csv(VERIFY_PATH, index=False, encoding="utf-8")
+    return rules, verification
 
 
 # Ejecutar: python -m src.clean_farm
@@ -172,23 +409,29 @@ if __name__ == "__main__":
     from src.logging_config import setup_logging
 
     setup_logging()
-    rules = run()
+    rules, verification = run()
     print("\nReglas aplicadas:")
     print(rules.to_string(index=False))
 
     summary = read_sql(
         """
-        SELECT f.farm_code, f.farm_name, f.province,
-               COUNT(p.pond_id)       AS piscinas,
-               ROUND(SUM(p.area_ha), 2) AS hectareas
+        SELECT f.farm_code,
+               COUNT(DISTINCT p.pond_id)              AS piscinas,
+               COUNT(DISTINCT c.cycle_id)             AS ciclos,
+               ROUND(SUM(h.harvested_lb) / 1e6, 2)    AS millones_lb,
+               ROUND(AVG(c.days_of_culture), 1)       AS dias_promedio
         FROM silver.farms AS f
-        LEFT JOIN silver.ponds AS p ON p.farm_id = f.farm_id
-        GROUP BY f.farm_code, f.farm_name, f.province
+        JOIN silver.ponds             AS p ON p.farm_id  = f.farm_id
+        JOIN silver.production_cycles AS c ON c.pond_id  = p.pond_id
+        JOIN silver.harvests          AS h ON h.cycle_id = c.cycle_id
+        GROUP BY f.farm_code
         ORDER BY f.farm_code
         """
     )
-    print("\nFincas y piscinas en silver:")
+    print("\nCiclos y cosechas en silver (libras y días calculados por MySQL):")
     print(summary.to_string(index=False))
 
     ok, total = verify_ponds_against_truth()
-    print(f"\nVerificación contra la verdad: {ok}/{total} áreas correctas")
+    print(f"\nVerificación contra la verdad — áreas de piscinas: {ok}/{total}")
+    print("\nVerificación contra la verdad — ciclos y cosechas:")
+    print(verification.to_string(index=False))
