@@ -10,7 +10,7 @@ Decisiones de la Fase 7 (2026-11-09):
   3. Dimensiones: upsert (INSERT ... ON DUPLICATE KEY UPDATE), sin borrar.
      Hechos: reconstrucción completa en una transacción (pasos 7.4 y 7.5).
 
-Paso 7.2: dim_source, dim_product, dim_size.
+Paso 7.2: dim_source, dim_product, dim_size · Paso 7.3: dim_country, dim_pond.
 
 Ejecutar: python -m src.build_gold
 """
@@ -126,11 +126,89 @@ ON DUPLICATE KEY UPDATE
     sort_order   = src.sort_order
 """
 
-# (nombre, tabla de gold, tabla de silver, SQL, parámetros)
+# País con su región COPIADA dentro (desnormalización: Power BI no necesita otra tabla)
+# y la agrupación de mercados que usan los reportes del sector camaronero.
+DIM_COUNTRY_SQL = """
+INSERT INTO gold.dim_country
+    (country_key, iso3, m49_code, country_name_es, country_name_en,
+     region_code_m49, region_name_es, region_name_en, cna_market_group)
+SELECT * FROM (
+    SELECT c.country_id                                    AS country_key,
+           c.iso3,
+           c.m49_code,
+           c.country_name_es,
+           c.country_name_en,
+           COALESCE(r.m49_region_code, '000')              AS region_code_m49,
+           COALESCE(r.region_name_es, 'Desconocida')       AS region_name_es,
+           COALESCE(r.region_name_en, 'Unknown')           AS region_name_en,
+           CASE
+                WHEN c.iso3 = 'CHN'                         THEN 'China'
+                WHEN c.iso3 = 'USA'                         THEN 'EE. UU.'
+                WHEN r.m49_region_code = '150'              THEN 'Europa'
+                WHEN r.m49_region_code = '142'              THEN 'Resto de Asia'
+                WHEN r.m49_region_code IN ('419', '021')    THEN 'Resto de América'
+                WHEN r.m49_region_code = '002'              THEN 'África'
+                WHEN r.m49_region_code = '009'              THEN 'Oceanía'
+                ELSE 'Otros'
+           END                                             AS cna_market_group
+    FROM silver.countries AS c
+    LEFT JOIN silver.regions AS r ON r.region_id = c.region_id
+) AS src
+ON DUPLICATE KEY UPDATE
+    iso3             = src.iso3,
+    m49_code         = src.m49_code,
+    country_name_es  = src.country_name_es,
+    country_name_en  = src.country_name_en,
+    region_code_m49  = src.region_code_m49,
+    region_name_es   = src.region_name_es,
+    region_name_en   = src.region_name_en,
+    cna_market_group = src.cna_market_group
+"""
+
+# Piscina con los datos de su finca COPIADOS dentro (SIMULADO)
+DIM_POND_SQL = """
+INSERT INTO gold.dim_pond
+    (pond_key, pond_code, farm_code, farm_name, province, area_ha, area_band, is_simulated)
+SELECT * FROM (
+    SELECT p.pond_id                                       AS pond_key,
+           p.pond_code,
+           f.farm_code,
+           f.farm_name,
+           f.province,
+           p.area_ha,
+           CASE WHEN p.area_ha IS NULL THEN 'Desconocida'
+                WHEN p.area_ha < 5     THEN '< 5 ha'
+                WHEN p.area_ha <= 10   THEN '5-10 ha'
+                ELSE '> 10 ha'
+           END                                             AS area_band,
+           TRUE                                            AS is_simulated
+    FROM silver.ponds AS p
+    JOIN silver.farms AS f ON f.farm_id = p.farm_id
+) AS src
+ON DUPLICATE KEY UPDATE
+    pond_code    = src.pond_code,
+    farm_code    = src.farm_code,
+    farm_name    = src.farm_name,
+    province     = src.province,
+    area_ha      = src.area_ha,
+    area_band    = src.area_band,
+    is_simulated = src.is_simulated
+"""
+
+# (nombre, tabla gold, tabla silver, (llave gold, llave silver), SQL, parámetros)
+# El orden importa poco aquí (las dimensiones no dependen entre sí), pero TODAS deben
+# cargarse antes que los hechos por las llaves foráneas.
 DIMENSIONS = [
-    ("dim_source", "gold.dim_source", "silver.data_sources", DIM_SOURCE_SQL, {}),
-    ("dim_product", "gold.dim_product", "silver.products", DIM_PRODUCT_SQL, {}),
-    ("dim_size", "gold.dim_size", "silver.sizes", DIM_SIZE_SQL, {"g_per_lb": GRAMS_PER_LB}),
+    ("dim_source", "gold.dim_source", "silver.data_sources", ("source_key", "source_id"),
+     DIM_SOURCE_SQL, {}),
+    ("dim_product", "gold.dim_product", "silver.products", ("product_key", "product_id"),
+     DIM_PRODUCT_SQL, {}),
+    ("dim_size", "gold.dim_size", "silver.sizes", ("size_key", "size_id"),
+     DIM_SIZE_SQL, {"g_per_lb": GRAMS_PER_LB}),
+    ("dim_country", "gold.dim_country", "silver.countries", ("country_key", "country_id"),
+     DIM_COUNTRY_SQL, {}),
+    ("dim_pond", "gold.dim_pond", "silver.ponds", ("pond_key", "pond_id"),
+     DIM_POND_SQL, {}),
 ]
 
 
@@ -141,7 +219,7 @@ def _count(conn: Connection, table: str) -> int:
 
 
 def load_dimension(conn: Connection, name: str, gold_table: str, silver_table: str,
-                   sql: str, params: dict) -> dict:
+                   key: tuple[str, str], sql: str, params: dict) -> dict:
     """Ejecuta el upsert de una dimensión y verifica que no falte ninguna fila de silver."""
     before = _count(conn, gold_table)
     conn.execute(text(sql), params)
@@ -149,9 +227,6 @@ def load_dimension(conn: Connection, name: str, gold_table: str, silver_table: s
     expected = _count(conn, silver_table)
 
     # Control: toda fila de silver debe tener su llave en gold
-    key = {"dim_source": ("source_key", "source_id"),
-           "dim_product": ("product_key", "product_id"),
-           "dim_size": ("size_key", "size_id")}[name]
     missing = conn.execute(text(
         f"SELECT COUNT(*) FROM {silver_table} AS s "
         f"LEFT JOIN {gold_table} AS g ON g.{key[0]} = s.{key[1]} "
@@ -159,7 +234,7 @@ def load_dimension(conn: Connection, name: str, gold_table: str, silver_table: s
     )).scalar_one()
     if missing:
         raise ValueError(f"{name}: {missing} filas de {silver_table} no llegaron a gold "
-                         "(¿count_basis desconocido en sizes?)")
+                         "(¿count_basis desconocido en sizes o piscina sin finca?)")
 
     result = {"dimension": name, "silver": expected, "gold_total": after,
               "nuevas": after - before}
@@ -199,3 +274,19 @@ if __name__ == "__main__":
     print("\ndim_size:")
     print(read_sql("SELECT size_key, size_code, min_weight_g, max_weight_g, size_group, "
                    "sort_order FROM gold.dim_size ORDER BY sort_order").to_string(index=False))
+
+    print("\ndim_country — países por grupo de mercado (sin miembros 0/9999):")
+    print(read_sql(
+        "SELECT cna_market_group AS grupo, CAST(COUNT(*) AS SIGNED) AS paises, "
+        "GROUP_CONCAT(iso3 ORDER BY iso3 SEPARATOR ' ') AS ejemplos "
+        "FROM gold.dim_country WHERE country_key NOT IN (0, 9999) "
+        "GROUP BY cna_market_group ORDER BY paises DESC"
+    ).assign(ejemplos=lambda d: d["ejemplos"].str.slice(0, 60)).to_string(index=False))
+
+    print("\ndim_pond — piscinas por finca y rango de área (SIMULADO):")
+    print(read_sql(
+        "SELECT farm_code, province, area_band, CAST(COUNT(*) AS SIGNED) AS piscinas, "
+        "ROUND(SUM(area_ha), 2) AS hectareas "
+        "FROM gold.dim_pond WHERE pond_key <> 0 "
+        "GROUP BY farm_code, province, area_band ORDER BY farm_code, area_band"
+    ).to_string(index=False))
