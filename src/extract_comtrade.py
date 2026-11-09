@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import argparse
@@ -24,6 +23,10 @@ ECUADOR = str(project.reporter_code)   # '218'
 WORLD_PARTNER_CODE = 0     # partnerCode 0 = "World" (total mundial, NO es un país)
 START_YEAR = 2018          # desde 2018 para poder calcular YoY de 2019
 PAUSE_SECONDS = 2          # pausa entre llamadas (límite de la API)
+# Extracción incremental (Fase 8): meses recientes que se vuelven a pedir porque las
+# cifras se corrigen. El espejo llega con más atraso (cada país publica a su ritmo).
+RECENT_MONTHS_EXPORT = 6
+RECENT_MONTHS_MIRROR = 12
 MAX_RETRIES = 3
 
 # Qué cambia entre los dos modos de consulta
@@ -281,6 +284,72 @@ def load_comtrade_mirror(start_year: int = START_YEAR) -> None:
     _load_years(by_year, "mirror")
 
 
+# --------------------------------------------------------------------------- incremental
+def shift_period(period: str, months: int) -> str:
+    """'202603' desplazado n meses (n negativo = hacia atrás). '202603', -5 → '202510'."""
+    index = int(period[:4]) * 12 + int(period[4:]) - 1 + months
+    return f"{index // 12}{index % 12 + 1:02d}"
+
+
+def last_closed_period() -> str:
+    """Mes anterior al actual (AAAAMM): el último que puede tener datos."""
+    today = datetime.now()
+    return shift_period(f"{today.year}{today.month:02d}", -1)
+
+
+def periods_in_bronze(flow: str) -> set[str]:
+    """Meses que ya tienen al menos una fila en bronze para el flujo 'X' o 'M'."""
+    return set(read_sql(
+        "SELECT DISTINCT period FROM bronze.comtrade_raw WHERE flow_code = :f", {"f": flow}
+    )["period"])
+
+
+def group_by_year(periods: list[str]) -> dict[str, list[str]]:
+    """{'2025': ['202501', ...]}: la API acepta hasta 12 meses por llamada."""
+    by_year: dict[str, list[str]] = {}
+    for p in sorted(periods):
+        by_year.setdefault(p[:4], []).append(p)
+    return by_year
+
+
+def extract_incremental(start_year: int = START_YEAR) -> dict[str, int]:
+    """
+    Extracción INCREMENTAL (para el pipeline, opción --extract). Pide a la API solo:
+      - exportaciones (X): los últimos RECENT_MONTHS_EXPORT meses publicados por Ecuador
+        y los meses publicados que todavía no están en bronze;
+      - espejo (M): los últimos RECENT_MONTHS_MIRROR meses cerrados y los meses que
+        todavía no tienen ninguna fila en bronze.
+    Las filas que ya existen (misma huella) no se vuelven a insertar; si un país corrigió
+    una cifra, entra como versión nueva y silver toma la más reciente (ROW_NUMBER).
+    Devuelve cuántos meses se pidieron y cuántas filas nuevas entraron por flujo.
+    """
+    # Exportaciones de Ecuador: primero se pregunta qué meses están publicados (1 llamada)
+    available = get_availability("M")
+    published = sorted(p for p in available["period"] if p >= f"{start_year}01")
+    targets_x: list[str] = []
+    if published:
+        recent_from = shift_period(published[-1], -(RECENT_MONTHS_EXPORT - 1))
+        have_x = periods_in_bronze("X")
+        targets_x = [p for p in published if p >= recent_from or p not in have_x]
+    logger.info("Incremental [export]: %s meses a pedir (%s)", len(targets_x),
+                ", ".join(targets_x) or "ninguno")
+    new_x = _load_years(group_by_year(targets_x), "export") if targets_x else 0
+
+    # Espejo: meses recientes + meses sin ninguna fila todavía
+    last = last_closed_period()
+    recent_from_m = shift_period(last, -(RECENT_MONTHS_MIRROR - 1))
+    have_m = periods_in_bronze("M")
+    targets_m = [p for p in expected_periods(start_year, last)
+                 if p >= recent_from_m or p not in have_m]
+    logger.info("Incremental [mirror]: %s meses a pedir (%s a %s)", len(targets_m),
+                targets_m[0] if targets_m else "-", targets_m[-1] if targets_m else "-")
+    time.sleep(PAUSE_SECONDS)
+    new_m = _load_years(group_by_year(targets_m), "mirror") if targets_m else 0
+
+    return {"export_months": len(targets_x), "export_new": new_x,
+            "mirror_months": len(targets_m), "mirror_new": new_m}
+
+
 # --------------------------------------------------------------------------- reportes
 def print_coverage(flow: str) -> None:
     """Cobertura por año leída desde la BASE para un flujo ('X' o 'M')."""
@@ -326,16 +395,23 @@ def print_gap_coverage(start_year: int = START_YEAR) -> None:
 # Ejecutar:
 #   python -m src.extract_comtrade            (≈ 1 + 1 llamada por año)
 #   python -m src.extract_comtrade --mirror   (≈ 1 llamada por año)
+#   python -m src.extract_comtrade --incremental   (solo meses recientes y faltantes, X y M)
 if __name__ == "__main__":
     from src.logging_config import setup_logging
 
     parser = argparse.ArgumentParser(description="Extracción de UN Comtrade a bronze")
     parser.add_argument("--mirror", action="store_true",
                         help="estadísticas espejo (importaciones de otros países desde Ecuador)")
+    parser.add_argument("--incremental", action="store_true",
+                        help="solo meses recientes y faltantes, exportaciones y espejo")
     args = parser.parse_args()
 
     setup_logging()
-    if args.mirror:
+    if args.incremental:
+        print(extract_incremental())
+        print_coverage("X")
+        print_coverage("M")
+    elif args.mirror:
         load_comtrade_mirror()
         print_coverage("M")
         print_gap_coverage()
