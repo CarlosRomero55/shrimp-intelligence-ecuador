@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS gold.dim_source (
     weight_unit       VARCHAR(5)    NULL,
     valuation_basis   VARCHAR(10)   NULL,
     is_simulated      BOOLEAN       NOT NULL,
-    is_reference      BOOLEAN       NOT NULL,          -- TRUE solo para UN_COMTRADE
+    is_reference      BOOLEAN       NOT NULL,          -- TRUE solo para BCE (referencia oficial, ADR-006)
     dw_loaded_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (source_key),
@@ -211,6 +211,27 @@ INSERT INTO gold.dim_source
     (source_key, source_code, source_name, publisher, weight_unit, valuation_basis, is_simulated, is_reference)
 VALUES (0, 'UNKNOWN', 'Desconocida', 'Desconocido', NULL, NULL, FALSE, FALSE) AS r
 ON DUPLICATE KEY UPDATE source_name = r.source_name;
+
+-- -----------------------------------------------------------------------------
+-- 2.7 Miembros ESPECIALES (llave 9999) — Fase 7, ADR-006 — idempotente
+-- No son "desconocidos": representan la parte del total oficial del BCE que
+-- ninguna fuente detalla por país ni por partida. Así la suma por país en
+-- fact_exports cuadra EXACTAMENTE con el total nacional del BCE.
+-- 'XXX' está en el rango que ISO 3166 reserva para usos propios (XAA-XZZ).
+-- -----------------------------------------------------------------------------
+INSERT INTO gold.dim_country
+    (country_key, iso3, m49_code, country_name_es, country_name_en,
+     region_code_m49, region_name_es, region_name_en, cna_market_group)
+VALUES (9999, 'XXX', NULL, 'Sin reporte por país', 'Not reported by country',
+        '000', 'Sin región', 'No region', 'Sin desglose') AS r
+ON DUPLICATE KEY UPDATE country_name_es = r.country_name_es;
+
+INSERT INTO gold.dim_product
+    (product_key, hs_code, hs_heading, product_category, category_name_es, product_name_es, product_name_en)
+VALUES (9999, 'TOTAL', 'N/A', 'total', 'Sin desglose',
+        'Camarón (total BCE sin desglose por partida)', 'Shrimp (BCE total, no HS breakdown)') AS r
+ON DUPLICATE KEY UPDATE product_name_es = r.product_name_es;
+
 -- -----------------------------------------------------------------------------
 -- SECCIÓN 3: Tablas de hechos
 -- Reglas:
@@ -220,11 +241,15 @@ ON DUPLICATE KEY UPDATE source_name = r.source_name;
 --   * Nunca se mezclan granos distintos en una misma tabla.
 -- -----------------------------------------------------------------------------
 
--- 3.1 Exportaciones. GRANO: un país x una partida HS x un mes (fuente: UN Comtrade)
+-- 3.1 Exportaciones. GRANO: un país x una partida HS x un mes x una fuente
+--     Fuentes (ADR-006): Comtrade X (Ecuador), espejo (importadores) y BCE (diferencia
+--     'Sin reporte por país'). is_preferred = 1 marca la cifra que usa el dashboard.
 CREATE TABLE IF NOT EXISTS gold.fact_exports (
     date_key          INT UNSIGNED      NOT NULL,      -- siempre el día 1 del mes (AAAAMM01)
     country_key       SMALLINT UNSIGNED NOT NULL,
     product_key       SMALLINT UNSIGNED NOT NULL,
+    source_key        TINYINT UNSIGNED  NOT NULL,      -- fuente de la cifra (dim_source)
+    is_preferred      TINYINT(1)        NOT NULL DEFAULT 0,  -- 1 = cifra que usa el dashboard
 
     -- Hechos aditivos
     value_usd         DECIMAL(18,2)     NOT NULL,
@@ -235,19 +260,23 @@ CREATE TABLE IF NOT EXISTS gold.fact_exports (
     source_batch_id   VARCHAR(40)       NOT NULL,
     dw_loaded_at      DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    -- La PK ES el grano
-    PRIMARY KEY (date_key, country_key, product_key),
+    -- La PK ES el grano: mes x país x partida x fuente
+    PRIMARY KEY (date_key, country_key, product_key, source_key),
     KEY ix_fexp_country (country_key),
     KEY ix_fexp_product (product_key),
+    KEY ix_fact_exports_preferred (is_preferred, date_key),
 
     CONSTRAINT chk_fexp_month_start CHECK (date_key MOD 100 = 1),   -- termina en 01
-    CONSTRAINT chk_fexp_value       CHECK (value_usd >= 0),
+    -- Valores >= 0, salvo 'Sin reporte por país' (9999): puede ser negativo en meses en que
+    -- el detalle espejo (CIF, con desfase de llegada) supera al total del BCE (ADR-006).
+    CONSTRAINT chk_fexp_value       CHECK (value_usd >= 0 OR country_key = 9999),
 
     CONSTRAINT fk_fexp_date    FOREIGN KEY (date_key)    REFERENCES gold.dim_date (date_key),
+    CONSTRAINT fk_fexp_source  FOREIGN KEY (source_key)  REFERENCES gold.dim_source (source_key),
     CONSTRAINT fk_fexp_country FOREIGN KEY (country_key) REFERENCES gold.dim_country (country_key),
     CONSTRAINT fk_fexp_product FOREIGN KEY (product_key) REFERENCES gold.dim_product (product_key)
 ) ENGINE = InnoDB
-  COMMENT = 'GOLD: hechos de exportación. Grano = país x partida x mes. Fuente: UN Comtrade';
+  COMMENT = 'GOLD: hechos de exportación. Grano = país x partida x mes x fuente (ADR-006)';
 
 -- 3.2 Producción. GRANO: un ciclo de cultivo en una piscina (DATOS SIMULADOS)
 CREATE TABLE IF NOT EXISTS gold.fact_production (
@@ -299,3 +328,43 @@ CREATE TABLE IF NOT EXISTS gold.fact_production (
     CONSTRAINT fk_fprod_size     FOREIGN KEY (size_key)          REFERENCES gold.dim_size (size_key)
 ) ENGINE = InnoDB
   COMMENT = 'GOLD: hechos de producción. Grano = ciclo de cultivo por piscina (SIMULADO)';
+
+-- -----------------------------------------------------------------------------
+-- SECCIÓN 4: Vista de conciliación de fuentes (Fase 7, ADR-006)
+-- Para la página "Conciliación" de Power BI. Una vista NO copia datos: muestra
+-- siempre lo actual de silver.source_reconciliation, con nombres de gold.
+--   * comparison_level = 'total'  : fuente (X o espejo) vs BCE, por mes
+--   * comparison_level = 'country': espejo vs Ecuador (X), por mes y país
+--   * is_comparable = 0 si falta un lado o |brecha| > 1.000 % (montos mínimos)
+-- Se crea con root (el usuario del ETL no tiene CREATE VIEW).
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW gold.v_reconciliation AS
+SELECT YEAR(r.period_date) * 10000 + MONTH(r.period_date) * 100 + 1   AS date_key,
+       r.period_date,
+       r.comparison_level,
+       r.country_id                                                   AS country_key,
+       COALESCE(c.iso3, 'TOT')                                        AS iso3,
+       COALESCE(c.country_name_es, 'Total nacional')                  AS country_name_es,
+       COALESCE(c.cna_market_group, 'Total nacional')                 AS cna_market_group,
+       r.source_id                                                    AS source_key,
+       s.source_code                                                  AS source_code,
+       r.reference_source_id                                          AS reference_source_key,
+       rs.source_code                                                 AS reference_source_code,
+       r.value_usd,
+       r.reference_value_usd,
+       r.gap_usd,
+       r.gap_pct,
+       CASE WHEN r.value_usd IS NULL OR r.reference_value_usd IS NULL THEN 0
+            WHEN ABS(r.gap_pct) > 1000                                 THEN 0
+            ELSE 1
+       END                                                            AS is_comparable,
+       CASE WHEN r.value_usd IS NULL           THEN 'La fuente comparada no reportó'
+            WHEN r.reference_value_usd IS NULL THEN 'La referencia no reportó'
+            WHEN ABS(r.gap_pct) > 1000         THEN 'Brecha > 1.000 % (montos mínimos)'
+            ELSE 'Comparable'
+       END                                                            AS comparability_note,
+       r.probable_cause
+FROM silver.source_reconciliation AS r
+JOIN gold.dim_source      AS s  ON s.source_key  = r.source_id
+JOIN gold.dim_source      AS rs ON rs.source_key = r.reference_source_id
+LEFT JOIN gold.dim_country AS c ON c.country_key = r.country_id;
