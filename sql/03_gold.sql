@@ -267,7 +267,9 @@ CREATE TABLE IF NOT EXISTS gold.fact_exports (
     KEY ix_fact_exports_preferred (is_preferred, date_key),
 
     CONSTRAINT chk_fexp_month_start CHECK (date_key MOD 100 = 1),   -- termina en 01
-    CONSTRAINT chk_fexp_value       CHECK (value_usd >= 0),
+    -- Valores >= 0, salvo 'Sin reporte por país' (9999): puede ser negativo en meses en que
+    -- el detalle espejo (CIF, con desfase de llegada) supera al total del BCE (ADR-006).
+    CONSTRAINT chk_fexp_value       CHECK (value_usd >= 0 OR country_key = 9999),
 
     CONSTRAINT fk_fexp_date    FOREIGN KEY (date_key)    REFERENCES gold.dim_date (date_key),
     CONSTRAINT fk_fexp_source  FOREIGN KEY (source_key)  REFERENCES gold.dim_source (source_key),

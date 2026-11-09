@@ -11,6 +11,7 @@ Decisiones de la Fase 7 (2026-11-09):
      Hechos: reconstrucción completa en una transacción (pasos 7.4 y 7.5).
 
 Paso 7.2: dim_source, dim_product, dim_size · Paso 7.3: dim_country, dim_pond.
+Paso 7.4: fact_exports (Comtrade X + espejo + diferencia contra el BCE).
 
 Ejecutar: python -m src.build_gold
 """
@@ -26,6 +27,13 @@ from sqlalchemy.engine import Connection
 from src.db import get_engine, read_sql
 
 logger = logging.getLogger(__name__)
+
+# Fuentes (IDs fijos de silver.data_sources, ver catalogs.py)
+SRC_X, SRC_BCE, SRC_MIRROR = 1, 3, 5
+# Miembros especiales de 03_gold.sql: la parte del total BCE sin detalle por país ni partida
+NO_REPORT_KEY = 9999
+# Tolerancia del control "detalle preferido + sin reporte = BCE" (centavos de redondeo)
+BCE_TOLERANCE_USD = 1.0
 
 # Gramos por libra: para tallas expresadas en piezas por libra (hoy todas son por kg)
 GRAMS_PER_LB = 453.592
@@ -212,6 +220,150 @@ DIMENSIONS = [
 ]
 
 
+# ------------------------------------------------------------------ fact_exports (Paso 7.4)
+# Reconstrucción completa (decisión 3 de la Fase 7): se borra y se vuelve a insertar
+# en UNA transacción. Si un control falla, ROLLBACK: gold queda como estaba.
+
+# 1) Detalle por país de las dos fuentes. Regla is_preferred (ADR-006):
+#    - Comtrade X (Ecuador) es la preferida en todos sus meses;
+#    - el espejo es preferido SOLO en los meses en que Ecuador no publicó Y que el BCE
+#      ya publicó (un mes sin total oficial sería parcial: no va al dashboard).
+#    date_key = AAAAMM01 calculado con aritmética (sin DATE_FORMAT).
+FACT_EXPORTS_DETAIL_SQL = """
+INSERT INTO gold.fact_exports
+    (date_key, country_key, product_key, source_key, is_preferred,
+     value_usd, weight_kg, weight_lb, source_batch_id)
+SELECT YEAR(e.period_date) * 10000 + MONTH(e.period_date) * 100 + 1   AS date_key,
+       e.country_id                                                  AS country_key,
+       e.product_id                                                  AS product_key,
+       e.source_id                                                   AS source_key,
+       CASE WHEN e.source_id = :x       THEN 1
+            WHEN xm.period_date IS NULL
+             AND bm.period_date IS NOT NULL THEN 1  -- mes sin X: el espejo cubre el hueco
+            ELSE 0
+       END                                                           AS is_preferred,
+       e.value_usd,
+       e.weight_kg,
+       ROUND(e.weight_lb, 3)                                         AS weight_lb,
+       e.source_batch_id
+FROM silver.export_monthly AS e
+LEFT JOIN (SELECT DISTINCT period_date
+           FROM silver.export_monthly
+           WHERE source_id = :x) AS xm
+       ON xm.period_date = e.period_date
+LEFT JOIN (SELECT DISTINCT period_date
+           FROM silver.source_reconciliation
+           WHERE comparison_level = 'total') AS bm
+       ON bm.period_date = e.period_date
+WHERE e.source_id IN (:x, :mirror)
+"""
+
+# 2) 'Sin reporte por país' = total BCE − detalle preferido del mes (puede ser negativo,
+#    ver chk_fexp_value). Solo meses que el BCE publicó. Va con la fuente BCE.
+FACT_EXPORTS_NO_REPORT_SQL = """
+INSERT INTO gold.fact_exports
+    (date_key, country_key, product_key, source_key, is_preferred,
+     value_usd, weight_kg, weight_lb, source_batch_id)
+SELECT b.date_key,
+       :no_report, :no_report, :bce, 1,
+       ROUND(b.bce_usd - COALESCE(d.detail_usd, 0), 2),
+       NULL, NULL,                                  -- el cuadro del BCE no trae peso
+       :bce_batch
+FROM (SELECT YEAR(period_date) * 10000 + MONTH(period_date) * 100 + 1 AS date_key,
+             reference_value_usd                                    AS bce_usd
+      FROM silver.source_reconciliation
+      WHERE comparison_level = 'total' AND source_id = :x) AS b
+LEFT JOIN (SELECT date_key, SUM(value_usd) AS detail_usd
+           FROM gold.fact_exports
+           WHERE is_preferred = 1
+           GROUP BY date_key) AS d
+       ON d.date_key = b.date_key
+"""
+
+# Lote vigente del BCE (para trazabilidad de la fila 'Sin reporte por país')
+BCE_BATCH_SQL = """
+SELECT batch_id FROM bronze.bce_raw
+WHERE table_code = '3.1.2' AND series_name = 'Camarón'
+ORDER BY extracted_at DESC, raw_id DESC
+LIMIT 1
+"""
+
+# Controles después de cargar (cada uno debe devolver 0 filas o el número esperado)
+CHECK_BCE_SQL = """
+SELECT b.date_key, b.bce_usd, p.preferred_usd
+FROM (SELECT YEAR(period_date) * 10000 + MONTH(period_date) * 100 + 1 AS date_key,
+             reference_value_usd AS bce_usd
+      FROM silver.source_reconciliation
+      WHERE comparison_level = 'total' AND source_id = :x) AS b
+LEFT JOIN (SELECT date_key, SUM(value_usd) AS preferred_usd
+           FROM gold.fact_exports WHERE is_preferred = 1 GROUP BY date_key) AS p
+       ON p.date_key = b.date_key
+WHERE p.preferred_usd IS NULL OR ABS(p.preferred_usd - b.bce_usd) > :tol
+"""
+
+# Ninguna cifra preferida en meses sin total del BCE (el total anual debe ser el del BCE)
+CHECK_OUTSIDE_BCE_SQL = """
+SELECT f.date_key, COUNT(*) AS filas
+FROM gold.fact_exports AS f
+LEFT JOIN (SELECT DISTINCT YEAR(period_date) * 10000 + MONTH(period_date) * 100 + 1 AS date_key
+           FROM silver.source_reconciliation
+           WHERE comparison_level = 'total') AS b
+       ON b.date_key = f.date_key
+WHERE f.is_preferred = 1 AND b.date_key IS NULL
+GROUP BY f.date_key
+"""
+
+CHECK_ONE_PREFERRED_SQL = """
+SELECT date_key, country_key, product_key, COUNT(*) AS preferidas
+FROM gold.fact_exports
+WHERE is_preferred = 1
+GROUP BY date_key, country_key, product_key
+HAVING COUNT(*) > 1
+"""
+
+
+def build_fact_exports() -> pd.DataFrame:
+    """Reconstruye gold.fact_exports y verifica que cuadre con silver y con el BCE."""
+    params = {"x": SRC_X, "mirror": SRC_MIRROR, "bce": SRC_BCE,
+              "no_report": NO_REPORT_KEY, "tol": BCE_TOLERANCE_USD}
+    start = time.perf_counter()
+    with get_engine().begin() as conn:
+        params["bce_batch"] = conn.execute(text(BCE_BATCH_SQL)).scalar_one()
+
+        deleted = conn.execute(text("DELETE FROM gold.fact_exports")).rowcount
+        detail = conn.execute(text(FACT_EXPORTS_DETAIL_SQL), params).rowcount
+        no_report = conn.execute(text(FACT_EXPORTS_NO_REPORT_SQL), params).rowcount
+        logger.info("fact_exports | borradas %s | detalle %s | sin reporte %s",
+                    deleted, detail, no_report)
+
+        # Control 1: cada fila de silver (fuentes X y espejo) llegó a gold
+        silver_rows = conn.execute(text(
+            "SELECT COUNT(*) FROM silver.export_monthly WHERE source_id IN (:x, :mirror)"
+        ), params).scalar_one()
+        if detail != silver_rows:
+            raise ValueError(f"fact_exports: {detail} filas de detalle vs {silver_rows} en silver")
+
+        # Control 2: en cada mes del BCE, detalle preferido + sin reporte = total BCE
+        bad = conn.execute(text(CHECK_BCE_SQL), params).all()
+        if bad:
+            raise ValueError(f"fact_exports: {len(bad)} meses no cuadran con el BCE, "
+                             f"ej. {bad[:3]}")
+
+        # Control 3: nada preferido fuera de los meses del BCE
+        outside = conn.execute(text(CHECK_OUTSIDE_BCE_SQL)).all()
+        if outside:
+            raise ValueError(f"fact_exports: cifras preferidas en meses sin BCE: {outside[:3]}")
+
+        # Control 4: a lo más UNA cifra preferida por mes, país y partida
+        dup = conn.execute(text(CHECK_ONE_PREFERRED_SQL)).all()
+        if dup:
+            raise ValueError(f"fact_exports: {len(dup)} combinaciones con 2 cifras preferidas")
+
+    logger.info("fact_exports reconstruida y verificada en %.2f s", time.perf_counter() - start)
+    return pd.DataFrame([{"tabla": "fact_exports", "borradas": deleted, "detalle": detail,
+                          "sin_reporte": no_report, "total": detail + no_report}])
+
+
 # ------------------------------------------------------------------ ejecución
 def _count(conn: Connection, table: str) -> int:
     # table viene de la lista fija DIMENSIONS (no de un usuario): es seguro en el texto
@@ -252,8 +404,9 @@ def build_dimensions() -> pd.DataFrame:
     return pd.DataFrame(results)
 
 
-def run() -> pd.DataFrame:
-    return build_dimensions()
+def run() -> tuple[pd.DataFrame, pd.DataFrame]:
+    # Primero las dimensiones (los hechos dependen de ellas por las llaves foráneas)
+    return build_dimensions(), build_fact_exports()
 
 
 # Ejecutar: python -m src.build_gold
@@ -261,9 +414,28 @@ if __name__ == "__main__":
     from src.logging_config import setup_logging
 
     setup_logging()
-    summary = run()
+    summary, facts = run()
     print("\nDimensiones de gold:")
     print(summary.to_string(index=False))
+    print("\nHechos de gold (reconstrucción completa):")
+    print(facts.to_string(index=False))
+
+    print("\nfact_exports por año — cifras PREFERIDAS (lo que verá el dashboard), millones USD:")
+    print(read_sql(
+        """
+        SELECT d.calendar_year                                                  AS anio,
+               ROUND(SUM(CASE WHEN f.source_key = 1 THEN f.value_usd END) / 1e6, 1) AS ecuador_x,
+               ROUND(SUM(CASE WHEN f.source_key = 5 THEN f.value_usd END) / 1e6, 1) AS espejo,
+               ROUND(SUM(CASE WHEN f.source_key = 3 THEN f.value_usd END) / 1e6, 1) AS sin_reporte,
+               ROUND(SUM(f.value_usd) / 1e6, 1)                                 AS total,
+               CAST(SUM(f.source_key = 3 AND f.value_usd < 0) AS SIGNED)        AS meses_neg
+        FROM gold.fact_exports AS f
+        JOIN gold.dim_date AS d ON d.date_key = f.date_key
+        WHERE f.is_preferred = 1
+        GROUP BY d.calendar_year
+        ORDER BY anio
+        """
+    ).to_string(index=False))
 
     print("\ndim_source:")
     print(read_sql("SELECT source_key, source_code, valuation_basis, is_simulated, "
