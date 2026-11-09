@@ -2,7 +2,8 @@
 pipeline.py — Ejecuta todo el proceso en orden con un solo comando (Fase 8, Paso 8.2).
 
 Etapas (todas con el mismo batch_id y registradas en ops.etl_runs):
-  1. extract.comtrade        omitida por ahora (el Paso 8.3 agrega --extract)
+  1. extract.comtrade        solo con --extract: extracción INCREMENTAL de UN Comtrade
+                             (meses recientes y faltantes; usa la llave de la API)
   2. silver.export_monthly   clean_exports.run()
   3. silver.farm             clean_farm.run()
   4. silver.reconciliation   reconcile.run()      (necesita export_monthly limpio)
@@ -16,7 +17,8 @@ falla, las siguientes no corren) y pytest como puerta de calidad final.
 Código de salida: 0 = todo bien · 1 = alguna etapa falló (útil para programarlo).
 
 Uso:
-    python -m src.pipeline
+    python -m src.pipeline                      # transformaciones + reporte + pruebas
+    python -m src.pipeline --extract            # además trae datos nuevos de Comtrade
     python -m src.pipeline --skip-tests
     python -m src.pipeline --triggered-by scheduler
 """
@@ -32,7 +34,8 @@ import time
 
 import pandas as pd
 
-from src import build_gold, clean_exports, clean_farm, quality_report, reconcile
+from src import (build_gold, clean_exports, clean_farm, extract_comtrade, quality_report,
+                 reconcile)
 from src.config import ROOT_DIR
 from src.db import read_sql
 from src.run_log import make_run_batch_id, track_step
@@ -77,12 +80,20 @@ def run_quality_gate() -> tuple[int, int, str]:
 
 
 # ------------------------------------------------------------------ etapas
-def run_pipeline(batch_id: str, *, triggered_by: str, skip_tests: bool) -> None:
+def run_pipeline(batch_id: str, *, triggered_by: str, skip_tests: bool,
+                 extract: bool = False) -> None:
     common = {"triggered_by": triggered_by}
 
-    # 1) Extracción: se activa en el Paso 8.3 (--extract)
+    # 1) Extracción incremental de UN Comtrade (solo con --extract: usa la llave de la API).
+    #    El BCE sigue siendo descarga manual (docs/fuentes/bce_descarga_manual.md).
     with track_step(batch_id, "extract.comtrade", source_name="UN Comtrade", **common) as step:
-        step.skip("sin --extract: se usan los datos ya cargados en bronze")
+        if extract:
+            result = extract_comtrade.extract_incremental()
+            step.rows_read = result["export_months"] + result["mirror_months"]  # meses pedidos
+            step.rows_inserted = result["export_new"] + result["mirror_new"]    # filas nuevas
+            logger.info("Extracción incremental: %s", result)
+        else:
+            step.skip("sin --extract: se usan los datos ya cargados en bronze")
 
     # 2) Exportaciones → silver.export_monthly
     with track_step(batch_id, "silver.export_monthly", source_name="UN Comtrade",
@@ -154,6 +165,8 @@ def print_summary(batch_id: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Pipeline Shrimp Intelligence Ecuador")
+    parser.add_argument("--extract", action="store_true",
+                        help="extracción incremental de UN Comtrade (llama a la API con tu llave)")
     parser.add_argument("--skip-tests", action="store_true",
                         help="no correr la puerta de calidad (pytest -m db)")
     parser.add_argument("--triggered-by", default="manual",
@@ -164,7 +177,8 @@ def main() -> int:
     start = time.perf_counter()
     logger.info("Pipeline %s | iniciado por %s", batch_id, args.triggered_by)
     try:
-        run_pipeline(batch_id, triggered_by=args.triggered_by, skip_tests=args.skip_tests)
+        run_pipeline(batch_id, triggered_by=args.triggered_by, skip_tests=args.skip_tests,
+                     extract=args.extract)
         code = 0
     except Exception:                       # el detalle ya quedó en ops.etl_runs y en el log
         logger.exception("Pipeline detenido")
