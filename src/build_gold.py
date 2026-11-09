@@ -12,6 +12,7 @@ Decisiones de la Fase 7 (2026-11-09):
 
 Paso 7.2: dim_source, dim_product, dim_size · Paso 7.3: dim_country, dim_pond.
 Paso 7.4: fact_exports (Comtrade X + espejo + diferencia contra el BCE).
+Paso 7.5: fact_production (un ciclo de la finca SIMULADA por fila).
 
 Ejecutar: python -m src.build_gold
 """
@@ -364,6 +365,99 @@ def build_fact_exports() -> pd.DataFrame:
                           "sin_reporte": no_report, "total": detail + no_report}])
 
 
+# ------------------------------------------------------------------ fact_production (Paso 7.5)
+# Grano: UN ciclo de cultivo (SIMULADO). Solo hechos ADITIVOS: FCR, supervivencia,
+# lb/ha, costo/lb y margen se calculan como medidas (Σ numerador ÷ Σ denominador).
+# Fechas AAAAMMDD por aritmética: dim_date cumple dos roles (siembra y cosecha).
+FACT_PRODUCTION_SQL = """
+INSERT INTO gold.fact_production
+    (cycle_key, cycle_code, pond_key, stocking_date_key, harvest_date_key, size_key,
+     days_of_culture, num_harvests, area_ha, larvae_stocked, harvested_animals,
+     harvested_kg, harvested_lb, feed_kg,
+     cost_larvae_usd, cost_feed_usd, cost_energy_usd, cost_labor_usd, total_cost_usd,
+     revenue_usd)
+SELECT c.cycle_id                                                          AS cycle_key,
+       c.cycle_code,
+       c.pond_id                                                           AS pond_key,
+       YEAR(c.stocking_date) * 10000 + MONTH(c.stocking_date) * 100
+           + DAY(c.stocking_date)                                          AS stocking_date_key,
+       YEAR(c.final_harvest_date) * 10000 + MONTH(c.final_harvest_date) * 100
+           + DAY(c.final_harvest_date)                                     AS harvest_date_key,
+       COALESCE(fh.size_id, 0)                                             AS size_key,
+       c.days_of_culture,                                  -- columna generada en silver
+       h.num_harvests,
+       p.area_ha,
+       c.larvae_stocked,
+       h.harvested_animals,
+       h.harvested_kg,
+       h.harvested_lb,
+       c.feed_kg,
+       COALESCE(k.larvae, 0), COALESCE(k.feed, 0), COALESCE(k.energy, 0), COALESCE(k.labor, 0),
+       COALESCE(k.larvae, 0) + COALESCE(k.feed, 0)
+           + COALESCE(k.energy, 0) + COALESCE(k.labor, 0)                  AS total_cost_usd,
+       COALESCE(r.revenue_usd, 0)                                          AS revenue_usd
+FROM silver.production_cycles AS c
+JOIN silver.ponds AS p ON p.pond_id = c.pond_id
+-- Cosechas del ciclo: piezas = kg × 1000 ÷ peso promedio (g)
+JOIN (SELECT cycle_id,
+             COUNT(*)                                        AS num_harvests,
+             ROUND(SUM(harvested_kg * 1000 / avg_weight_g))  AS harvested_animals,
+             SUM(harvested_kg)                               AS harvested_kg,
+             SUM(harvested_lb)                               AS harvested_lb
+      FROM silver.harvests
+      GROUP BY cycle_id) AS h ON h.cycle_id = c.cycle_id
+-- Talla de la cosecha FINAL
+LEFT JOIN silver.harvests AS fh
+       ON fh.cycle_id = c.cycle_id AND fh.harvest_type = 'final'
+-- Pivote de costos: 4 filas (largo) → 4 columnas (ancho)
+LEFT JOIN (SELECT cycle_id,
+                  SUM(CASE WHEN cost_type = 'larvae' THEN amount_usd ELSE 0 END) AS larvae,
+                  SUM(CASE WHEN cost_type = 'feed'   THEN amount_usd ELSE 0 END) AS feed,
+                  SUM(CASE WHEN cost_type = 'energy' THEN amount_usd ELSE 0 END) AS energy,
+                  SUM(CASE WHEN cost_type = 'labor'  THEN amount_usd ELSE 0 END) AS labor
+           FROM silver.cycle_costs
+           GROUP BY cycle_id) AS k ON k.cycle_id = c.cycle_id
+-- Ingreso del ciclo (revenue_usd ya lo calculó MySQL en silver: libras × precio)
+LEFT JOIN (SELECT hv.cycle_id, SUM(sa.revenue_usd) AS revenue_usd
+           FROM silver.sales AS sa
+           JOIN silver.harvests AS hv ON hv.harvest_id = sa.harvest_id
+           GROUP BY hv.cycle_id) AS r ON r.cycle_id = c.cycle_id
+"""
+
+# Control: los totales de gold deben ser idénticos a los de silver
+PRODUCTION_TOTALS_SQL = """
+SELECT (SELECT COUNT(*)                FROM silver.production_cycles) AS s_ciclos,
+       (SELECT COUNT(*)                FROM gold.fact_production)    AS g_ciclos,
+       (SELECT SUM(harvested_kg)       FROM silver.harvests)         AS s_kg,
+       (SELECT SUM(harvested_kg)       FROM gold.fact_production)    AS g_kg,
+       (SELECT SUM(amount_usd)         FROM silver.cycle_costs)      AS s_costo,
+       (SELECT SUM(total_cost_usd)     FROM gold.fact_production)    AS g_costo,
+       (SELECT SUM(revenue_usd)        FROM silver.sales)            AS s_ingreso,
+       (SELECT SUM(revenue_usd)        FROM gold.fact_production)    AS g_ingreso
+"""
+
+
+def build_fact_production() -> pd.DataFrame:
+    """Reconstruye gold.fact_production y verifica que cuadre con silver."""
+    start = time.perf_counter()
+    with get_engine().begin() as conn:
+        deleted = conn.execute(text("DELETE FROM gold.fact_production")).rowcount
+        inserted = conn.execute(text(FACT_PRODUCTION_SQL)).rowcount
+        t = conn.execute(text(PRODUCTION_TOTALS_SQL)).mappings().one()
+
+        checks = {"ciclos": (t["s_ciclos"], t["g_ciclos"]), "kg": (t["s_kg"], t["g_kg"]),
+                  "costo": (t["s_costo"], t["g_costo"]),
+                  "ingreso": (t["s_ingreso"], t["g_ingreso"])}
+        bad = {k: v for k, v in checks.items() if abs(float(v[0] or 0) - float(v[1] or 0)) > 0.01}
+        if bad:
+            raise ValueError(f"fact_production no cuadra con silver (silver, gold): {bad}")
+
+    logger.info("fact_production | borradas %s | insertadas %s | verificada en %.2f s",
+                deleted, inserted, time.perf_counter() - start)
+    return pd.DataFrame([{"tabla": "fact_production", "borradas": deleted, "detalle": inserted,
+                          "sin_reporte": 0, "total": inserted}])
+
+
 # ------------------------------------------------------------------ ejecución
 def _count(conn: Connection, table: str) -> int:
     # table viene de la lista fija DIMENSIONS (no de un usuario): es seguro en el texto
@@ -406,7 +500,9 @@ def build_dimensions() -> pd.DataFrame:
 
 def run() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Primero las dimensiones (los hechos dependen de ellas por las llaves foráneas)
-    return build_dimensions(), build_fact_exports()
+    dims = build_dimensions()
+    facts = pd.concat([build_fact_exports(), build_fact_production()], ignore_index=True)
+    return dims, facts
 
 
 # Ejecutar: python -m src.build_gold
@@ -432,6 +528,27 @@ if __name__ == "__main__":
         FROM gold.fact_exports AS f
         JOIN gold.dim_date AS d ON d.date_key = f.date_key
         WHERE f.is_preferred = 1
+        GROUP BY d.calendar_year
+        ORDER BY anio
+        """
+    ).to_string(index=False))
+
+    print("\nfact_production por año de cosecha (SIMULADO) — ratios calculados como Σ/Σ:")
+    print(read_sql(
+        """
+        SELECT d.calendar_year                                              AS anio,
+               CAST(COUNT(*) AS SIGNED)                                     AS ciclos,
+               ROUND(SUM(f.harvested_lb) / 1e6, 2)                          AS millones_lb,
+               ROUND(SUM(f.total_cost_usd) / 1e6, 2)                        AS costo_musd,
+               ROUND(SUM(f.revenue_usd) / 1e6, 2)                           AS ingreso_musd,
+               ROUND((SUM(f.revenue_usd) - SUM(f.total_cost_usd))
+                     / SUM(f.revenue_usd) * 100, 1)                         AS margen_pct,
+               ROUND(SUM(f.feed_kg) / SUM(f.harvested_kg), 2)               AS fcr,
+               ROUND(SUM(f.harvested_animals) / SUM(f.larvae_stocked) * 100, 1)
+                                                                            AS supervivencia_pct,
+               ROUND(SUM(f.harvested_lb) / SUM(f.area_ha), 0)               AS lb_por_ha_ciclo
+        FROM gold.fact_production AS f
+        JOIN gold.dim_date AS d ON d.date_key = f.harvest_date_key
         GROUP BY d.calendar_year
         ORDER BY anio
         """
