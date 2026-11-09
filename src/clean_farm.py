@@ -1,7 +1,7 @@
 """
 clean_farm.py — Limpieza de la finca simulada: bronze.farm_raw → tablas de silver.
 
-Paso 5.6: farms y ponds · Paso 5.7: production_cycles y harvests · (5.8: cycle_costs y sales).
+Paso 5.6: farms y ponds · 5.7: production_cycles y harvests · 5.8: cycle_costs y sales.
 
 Principio (ADR-002): silver guarda solo hechos MEDIDOS. Los ratios que trae bronze
 (fcr, survival_pct, density_pl_m2) no se guardan; gold los recalcula. Los datos que
@@ -21,7 +21,7 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 
-from src.catalogs import normalize_size
+from src.catalogs import normalize_alias, normalize_size
 from src.clean_exports import RuleLog
 from src.config import ROOT_DIR, project
 from src.db import read_sql, upsert
@@ -38,6 +38,9 @@ LB_PER_KG = project.kg_to_lb                  # 2.20462
 DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y"]
 FCR_TOLERANCE = 0.15                          # 15 %: FCR reportado vs alimento ÷ cosecha
 MAX_WEIGHT_G = 60                             # regla chk_harvests_weight
+# Columna de bronze → cost_type de silver (regla CHECK chk_costs_type)
+COST_COLUMNS = {"cost_larvae_usd": "larvae", "cost_feed_usd": "feed",
+                "cost_energy_usd": "energy", "cost_labor_usd": "labor"}
 
 # Lote vigente: la simulación se carga completa en cada lote, así que se usa SOLO el más
 # reciente. DENSE_RANK() es otra window function: da el MISMO número a todas las filas que
@@ -300,6 +303,92 @@ def to_harvests_table(clean: pd.DataFrame, cycle_ids: dict[str, int]) -> pd.Data
     })
 
 
+# ------------------------------------------------------------------ 5.8 costos
+def clean_costs(clean: pd.DataFrame, log: RuleLog, cycle_ids: dict[str, int]) -> pd.DataFrame:
+    """
+    Formato largo: 4 filas por ciclo (larvae, feed, energy, labor).
+    Costo nulo o negativo → IMPUTADO con la mediana de USD por hectárea-día del mismo tipo
+    de costo en la misma finca × área × días del ciclo (y marcado).
+    """
+    base = clean.assign(
+        cycle_id=clean["cycle_code"].map(cycle_ids),
+        ha_days=clean["area_ha"] * (pd.to_datetime(clean["harvest"])
+                                    - pd.to_datetime(clean["stocking"])).dt.days,
+    )
+    frames = []
+    for col, cost_type in COST_COLUMNS.items():
+        commas = base[col].fillna("").astype(str).str.contains(",", regex=False)
+        if commas.any():
+            log.add(f"coma_decimal_{col}", commas.sum(), "corregidas", "',' → '.'")
+        amount = base[col].map(parse_decimal)
+        negative = amount < 0
+        log.add(f"costo_negativo_{cost_type}", negative.sum(), "se imputan", "amount < 0")
+        amount = amount.mask(negative)
+
+        rate = amount / base["ha_days"]                        # USD por hectárea-día
+        median_rate = rate.groupby(base["farm_prefix"]).transform("median")
+        missing = amount.isna()
+        amount = amount.where(~missing, median_rate * base["ha_days"])
+        log.add(f"costo_imputado_{cost_type}", missing.sum(), "imputados",
+                "mediana USD/ha-día de la finca × área × días")
+
+        frames.append(pd.DataFrame({
+            "cycle_code": base["cycle_code"], "cycle_id": base["cycle_id"],
+            "cost_type": cost_type, "amount_usd": amount.round(2), "imputed": missing,
+        }))
+    costs = pd.concat(frames, ignore_index=True)
+    still_missing = costs["amount_usd"].isna() | costs["cycle_id"].isna()
+    log.add("costo_sin_valor", still_missing.sum(), "excluidas", "no se pudo imputar")
+    costs = costs[~still_missing]
+    costs["cycle_id"] = costs["cycle_id"].astype(int)
+    log.add("costos_para_silver", len(costs), "carga", "4 tipos por ciclo")
+    return costs
+
+
+# ------------------------------------------------------------------ 5.8 ventas
+def clean_sales(clean: pd.DataFrame, log: RuleLog, harvest_ids: dict[str, int],
+                alias_map: dict[str, int], names_es: set[str]) -> pd.DataFrame:
+    """
+    Una venta por cosecha: se vende toda la cosecha al precio y destino del ciclo.
+    sold_lb replica la misma conversión que la columna generada harvested_lb.
+    revenue_usd NO se envía: columna generada (sold_lb × price_usd_lb).
+    """
+    df = clean.assign(harvest_id=clean["cycle_code"].map(harvest_ids))
+
+    commas = df["sale_price_usd_lb"].fillna("").astype(str).str.contains(",", regex=False)
+    log.add("coma_decimal_precio", commas.sum(), "corregidas", "',' → '.'")
+    df["price"] = df["sale_price_usd_lb"].map(parse_decimal)
+    bad_price = df["price"].isna() | (df["price"] <= 0)
+    log.add("precio_invalido", bad_price.sum(), "excluidas", "regla chk_sales_price")
+    df = df[~bad_price]
+
+    # País de destino: cualquier variante → alias normalizado → country_id
+    raw_market = df["destination_market"]
+    df["country_id"] = raw_market.map(normalize_alias).map(alias_map)
+    is_null = raw_market.isna() | (raw_market.astype(str).str.strip() == "")
+    variant = ~is_null & df["country_id"].notna() & ~raw_market.isin(names_es)
+    not_found = ~is_null & df["country_id"].isna()
+    log.add("pais_variante_resuelta", variant.sum(), "resueltas por alias",
+            ", ".join(sorted(raw_market[variant].astype(str).unique())))
+    log.add("pais_nulo", is_null.sum(), "a NULL", "destino desconocido (columna opcional)")
+    log.add("pais_no_encontrado", not_found.sum(), "a NULL",
+            ", ".join(sorted(raw_market[not_found].astype(str).unique())))
+
+    no_harvest = df["harvest_id"].isna()
+    log.add("venta_sin_cosecha", no_harvest.sum(), "excluidas", "cosecha no cargada en silver")
+    df = df[~no_harvest]
+
+    sales = pd.DataFrame({
+        "harvest_id": df["harvest_id"].astype(int),
+        "sale_date": df["harvest"],
+        "sold_lb": (df["harvested_kg"].round(2) * LB_PER_KG).round(2),
+        "price_usd_lb": df["price"].round(4),
+        "destination_country_id": df["country_id"].astype("Int64"),
+    })
+    log.add("ventas_para_silver", len(sales), "carga", "upsert por harvest_id (una por cosecha)")
+    return sales.assign(cycle_code=df["cycle_code"].values)
+
+
 # ------------------------------------------------------------------ verificación vs. verdad
 def verify_ponds_against_truth() -> tuple[int, int]:
     """Compara las áreas de silver con la verdad de la simulación (antes de ensuciar)."""
@@ -361,6 +450,45 @@ def verify_cycles_against_truth(clean: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["control", "resultado", "nota"])
 
 
+def verify_costs_sales_against_truth(costs: pd.DataFrame, sales: pd.DataFrame,
+                                     iso_by_country: dict[int, str]) -> pd.DataFrame:
+    """Exactitud de costos y ventas frente a farm_clean_truth.csv."""
+    truth = pd.read_csv(TRUTH_PATH)
+    rows = []
+
+    long_truth = truth.melt(id_vars="cycle_code", value_vars=list(COST_COLUMNS),
+                            var_name="col", value_name="t_amount")
+    long_truth["cost_type"] = long_truth["col"].map(COST_COLUMNS)
+    m = long_truth.merge(costs, on=["cycle_code", "cost_type"], how="left")
+    measured = m["imputed"].eq(False)
+    imputed = m["imputed"].eq(True)
+    exact = (m["amount_usd"] - m["t_amount"]).abs() < 0.01
+    rows.append(("costos en silver", f"{int(m['amount_usd'].notna().sum())}/{len(m)}",
+                 "4 por ciclo"))
+    rows.append(("costos medidos exactos", f"{int((exact & measured).sum())}/{int(measured.sum())}", ""))
+    err = ((m["amount_usd"] - m["t_amount"]).abs() / m["t_amount"])[imputed]
+    rows.append(("costos imputados: error medio",
+                 f"{err.mean() * 100:.1f} %" if len(err) else "—",
+                 f"{int(imputed.sum())} imputados"))
+
+    s = truth[["cycle_code", "sale_price_usd_lb", "destination_market"]].merge(
+        sales, on="cycle_code", how="left")
+    rows.append(("ventas en silver", f"{int(s['harvest_id'].notna().sum())}/{len(s)}", ""))
+    price_ok = (s["price_usd_lb"] - s["sale_price_usd_lb"]).abs() < 0.0001
+    rows.append(("precio exacto", f"{int(price_ok.sum())}/{len(s)}", ""))
+
+    # La verdad usa nombres en español sin variantes ('Estados Unidos', 'China', ...)
+    truth_iso = {"China": "CHN", "Estados Unidos": "USA", "España": "ESP", "Francia": "FRA",
+                 "Italia": "ITA", "Vietnam": "VNM", "Rusia": "RUS"}
+    s["t_iso"] = s["destination_market"].map(truth_iso)
+    s["iso"] = s["destination_country_id"].map(iso_by_country)
+    known = s["iso"].notna()
+    rows.append(("país correcto (destino conocido)",
+                 f"{int((s['iso'] == s['t_iso'])[known].sum())}/{int(known.sum())}",
+                 f"{int((~known).sum())} con destino nulo en bronze"))
+    return pd.DataFrame(rows, columns=["control", "resultado", "nota"])
+
+
 # ------------------------------------------------------------------ orquestación
 def run() -> tuple[pd.DataFrame, pd.DataFrame]:
     log = RuleLog()
@@ -394,12 +522,32 @@ def run() -> tuple[pd.DataFrame, pd.DataFrame]:
     upsert(to_harvests_table(clean, cycle_ids), "silver", "harvests",
            key_cols=["cycle_id", "harvest_date"])
 
+    # 5.8 costos y ventas
+    costs = clean_costs(clean, log, cycle_ids)
+    upsert(costs[["cycle_id", "cost_type", "amount_usd"]], "silver", "cycle_costs",
+           key_cols=["cycle_id", "cost_type"])
+
+    harvests = read_sql("SELECT harvest_id, cycle_id FROM silver.harvests")
+    code_by_cycle = {v: k for k, v in cycle_ids.items()}
+    harvest_ids = {code_by_cycle[c]: h for h, c in zip(harvests["harvest_id"], harvests["cycle_id"])
+                   if c in code_by_cycle}
+    aliases = read_sql("SELECT alias_text, country_id FROM silver.country_aliases")
+    alias_map = dict(zip(aliases["alias_text"], aliases["country_id"]))
+    countries = read_sql("SELECT country_id, iso3, country_name_es FROM silver.countries")
+    sales = clean_sales(clean, log, harvest_ids, alias_map, set(countries["country_name_es"]))
+    # revenue_usd NO se envía: columna generada. Requiere UNIQUE (harvest_id) en silver.sales.
+    upsert(sales.drop(columns="cycle_code"), "silver", "sales", key_cols=["harvest_id"])
+
     rules = log.to_frame()
     QUALITY_PATH.parent.mkdir(parents=True, exist_ok=True)
     rules.to_csv(QUALITY_PATH, index=False, encoding="utf-8")
     logger.info("Registro de reglas guardado en %s", QUALITY_PATH.relative_to(ROOT_DIR))
 
-    verification = verify_cycles_against_truth(clean)
+    iso_by_country = dict(zip(countries["country_id"], countries["iso3"]))
+    verification = pd.concat([
+        verify_cycles_against_truth(clean),
+        verify_costs_sales_against_truth(costs, sales, iso_by_country),
+    ], ignore_index=True)
     verification.to_csv(VERIFY_PATH, index=False, encoding="utf-8")
     return rules, verification
 
@@ -431,7 +579,26 @@ if __name__ == "__main__":
     print("\nCiclos y cosechas en silver (libras y días calculados por MySQL):")
     print(summary.to_string(index=False))
 
+    money = read_sql(
+        """
+        SELECT YEAR(s.sale_date)                         AS anio,
+               COUNT(*)                                  AS ventas,
+               ROUND(SUM(s.revenue_usd) / 1e6, 2)        AS ingreso_musd,
+               ROUND(SUM(k.costo) / 1e6, 2)              AS costo_musd,
+               ROUND((SUM(s.revenue_usd) - SUM(k.costo))
+                     / SUM(s.revenue_usd) * 100, 1)      AS margen_pct
+        FROM silver.sales AS s
+        JOIN silver.harvests AS h ON h.harvest_id = s.harvest_id
+        JOIN (SELECT cycle_id, SUM(amount_usd) AS costo
+              FROM silver.cycle_costs GROUP BY cycle_id) AS k ON k.cycle_id = h.cycle_id
+        GROUP BY YEAR(s.sale_date)
+        ORDER BY anio
+        """
+    )
+    print("\nIngresos, costos y margen por año (ingreso calculado por MySQL):")
+    print(money.to_string(index=False))
+
     ok, total = verify_ponds_against_truth()
     print(f"\nVerificación contra la verdad — áreas de piscinas: {ok}/{total}")
-    print("\nVerificación contra la verdad — ciclos y cosechas:")
+    print("\nVerificación contra la verdad — ciclos, cosechas, costos y ventas:")
     print(verification.to_string(index=False))

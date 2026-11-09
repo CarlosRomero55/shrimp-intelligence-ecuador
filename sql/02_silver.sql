@@ -379,6 +379,7 @@ CREATE TABLE IF NOT EXISTS silver.sales (
 
     PRIMARY KEY (sale_id),
     KEY ix_sales_harvest (harvest_id),
+	UNIQUE KEY uq_sales_harvest (harvest_id),
     KEY ix_sales_date (sale_date),
     CONSTRAINT chk_sales_lb    CHECK (sold_lb > 0),
     CONSTRAINT chk_sales_price CHECK (price_usd_lb > 0),
