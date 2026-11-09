@@ -328,3 +328,43 @@ CREATE TABLE IF NOT EXISTS gold.fact_production (
     CONSTRAINT fk_fprod_size     FOREIGN KEY (size_key)          REFERENCES gold.dim_size (size_key)
 ) ENGINE = InnoDB
   COMMENT = 'GOLD: hechos de producción. Grano = ciclo de cultivo por piscina (SIMULADO)';
+
+-- -----------------------------------------------------------------------------
+-- SECCIÓN 4: Vista de conciliación de fuentes (Fase 7, ADR-006)
+-- Para la página "Conciliación" de Power BI. Una vista NO copia datos: muestra
+-- siempre lo actual de silver.source_reconciliation, con nombres de gold.
+--   * comparison_level = 'total'  : fuente (X o espejo) vs BCE, por mes
+--   * comparison_level = 'country': espejo vs Ecuador (X), por mes y país
+--   * is_comparable = 0 si falta un lado o |brecha| > 1.000 % (montos mínimos)
+-- Se crea con root (el usuario del ETL no tiene CREATE VIEW).
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW gold.v_reconciliation AS
+SELECT YEAR(r.period_date) * 10000 + MONTH(r.period_date) * 100 + 1   AS date_key,
+       r.period_date,
+       r.comparison_level,
+       r.country_id                                                   AS country_key,
+       COALESCE(c.iso3, 'TOT')                                        AS iso3,
+       COALESCE(c.country_name_es, 'Total nacional')                  AS country_name_es,
+       COALESCE(c.cna_market_group, 'Total nacional')                 AS cna_market_group,
+       r.source_id                                                    AS source_key,
+       s.source_code                                                  AS source_code,
+       r.reference_source_id                                          AS reference_source_key,
+       rs.source_code                                                 AS reference_source_code,
+       r.value_usd,
+       r.reference_value_usd,
+       r.gap_usd,
+       r.gap_pct,
+       CASE WHEN r.value_usd IS NULL OR r.reference_value_usd IS NULL THEN 0
+            WHEN ABS(r.gap_pct) > 1000                                 THEN 0
+            ELSE 1
+       END                                                            AS is_comparable,
+       CASE WHEN r.value_usd IS NULL           THEN 'La fuente comparada no reportó'
+            WHEN r.reference_value_usd IS NULL THEN 'La referencia no reportó'
+            WHEN ABS(r.gap_pct) > 1000         THEN 'Brecha > 1.000 % (montos mínimos)'
+            ELSE 'Comparable'
+       END                                                            AS comparability_note,
+       r.probable_cause
+FROM silver.source_reconciliation AS r
+JOIN gold.dim_source      AS s  ON s.source_key  = r.source_id
+JOIN gold.dim_source      AS rs ON rs.source_key = r.reference_source_id
+LEFT JOIN gold.dim_country AS c ON c.country_key = r.country_id;
