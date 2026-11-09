@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS gold.dim_country (
 -- 2.2 Productos (partidas HS)
 CREATE TABLE IF NOT EXISTS gold.dim_product (
     product_key       SMALLINT UNSIGNED NOT NULL,      -- = silver.products.product_id
+	source_key        TINYINT UNSIGNED  NOT NULL,      -- fuente de la cifra (dim_source)
+    is_preferred      TINYINT(1)        NOT NULL DEFAULT 0,  -- 1 = cifra que usa el dashboard
     hs_code           CHAR(6)       NOT NULL,
     hs_heading        CHAR(4)       NOT NULL,
     product_category  VARCHAR(20)   NOT NULL,          -- frozen | prepared
@@ -236,14 +238,16 @@ CREATE TABLE IF NOT EXISTS gold.fact_exports (
     dw_loaded_at      DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- La PK ES el grano
-    PRIMARY KEY (date_key, country_key, product_key),
+	PRIMARY KEY (date_key, country_key, product_key, source_key),
     KEY ix_fexp_country (country_key),
     KEY ix_fexp_product (product_key),
+	KEY ix_fact_exports_preferred (is_preferred, date_key),
 
     CONSTRAINT chk_fexp_month_start CHECK (date_key MOD 100 = 1),   -- termina en 01
     CONSTRAINT chk_fexp_value       CHECK (value_usd >= 0),
 
     CONSTRAINT fk_fexp_date    FOREIGN KEY (date_key)    REFERENCES gold.dim_date (date_key),
+	CONSTRAINT fk_fexp_source  FOREIGN KEY (source_key)  REFERENCES gold.dim_source (source_key),
     CONSTRAINT fk_fexp_country FOREIGN KEY (country_key) REFERENCES gold.dim_country (country_key),
     CONSTRAINT fk_fexp_product FOREIGN KEY (product_key) REFERENCES gold.dim_product (product_key)
 ) ENGINE = InnoDB
