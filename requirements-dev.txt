@@ -1,0 +1,3 @@
+# Solo para herramientas de desarrollo (tools/), no las usa el pipeline
+pycountry==26.2.16
+country_converter==1.3.2
