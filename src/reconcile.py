@@ -14,7 +14,12 @@ Las diferencias tienen causas explicables y son información (ver ADR-006).
 El BCE NO va a export_monthly: es un total sin país (ponerlo como un "país" haría que el
 total se sumara dos veces).
 
-Nivel 'country' (por país, Comtrade X vs espejo): se agrega en un paso posterior.
+Nivel 'country' (Paso 5.9): por cada mes y país, lo que Ecuador declara haber exportado
+(Comtrade X = fuente 1, FOB, REFERENCIA) frente a lo que el país comprador declara haber
+importado desde Ecuador (espejo = fuente 5, CIF). Solo meses en que Ecuador publicó en
+Comtrade. Si un lado no tiene el país ese mes, su valor queda vacío y la causa lo explica:
+  - espejo vacío  → el país importador no reportó ese mes (ej.: China 2025-2026);
+  - X vacío       → Ecuador no detalló ese país ese mes (envíos pequeños o reasignados).
 
 Ejecutar: python -m src.reconcile
 """
@@ -63,6 +68,23 @@ WITH ranked AS (
 SELECT raw_id, batch_id, period_label, value_raw, version_rank
 FROM ranked
 """
+
+# Detalle mensual por país de cada fuente (suma de los 3 códigos HS)
+COUNTRY_SQL = """
+SELECT source_id, period_date, country_id,
+       SUM(value_usd) AS value_usd,
+       SUM(weight_kg) AS weight_kg
+FROM silver.export_monthly
+WHERE source_id IN (:x, :mirror)
+GROUP BY source_id, period_date, country_id
+"""
+COUNTRY_CAUSES = {
+    "both": "Valoración CIF (espejo) vs FOB (Ecuador), desfase entre embarque y llegada, "
+            "y diferencias de clasificación HS entre aduanas.",
+    "mirror_missing": "El país importador no reportó a Comtrade este mes (ver ADR-006).",
+    "x_missing": "Ecuador no detalló este país en el mes (envío no declarado por país, "
+                 "reexportación o asignación a otro destino).",
+}
 
 # Total nacional mensual de cada fuente de detalle (suma de todos los países y productos)
 DETAIL_SQL = """
@@ -156,6 +178,60 @@ def build_total_level(log: RuleLog) -> pd.DataFrame:
                 "reference_weight_kg", "probable_cause", "computed_at"]]
 
 
+def build_country_level(log: RuleLog) -> pd.DataFrame:
+    """Una fila por mes y país: espejo (comparado) vs Comtrade X (referencia)."""
+    x_id, mirror_id = SOURCE_IDS["UN_COMTRADE"], SOURCE_IDS["COMTRADE_MIRROR"]
+    df = read_sql(COUNTRY_SQL, {"x": x_id, "mirror": mirror_id})
+    df["period_date"] = pd.to_datetime(df["period_date"]).dt.date
+    x = df[df["source_id"] == x_id].drop(columns="source_id")
+    mirror = df[df["source_id"] == mirror_id].drop(columns="source_id")
+
+    # Solo meses en que Ecuador publicó: sin referencia no hay comparación por país
+    x_months = set(x["period_date"])
+    outside = ~mirror["period_date"].isin(x_months)
+    log.add("espejo_mes_sin_x", outside.sum(), "excluidas",
+            f"{mirror.loc[outside, 'period_date'].nunique()} meses sin dato de Ecuador "
+            "(ya documentados en el nivel 'total')")
+    mirror = mirror[~outside]
+
+    merged = x.rename(columns={"value_usd": "reference_value_usd",
+                               "weight_kg": "reference_weight_kg"}).merge(
+        mirror, on=["period_date", "country_id"], how="outer")
+
+    no_mirror = merged["value_usd"].isna()
+    no_x = merged["reference_value_usd"].isna()
+    both = ~no_mirror & ~no_x
+    log.add("pais_en_ambas_fuentes", both.sum(), "comparadas", "CIF vs FOB")
+    log.add("pais_sin_espejo", no_mirror.sum(), "conservadas con NULL",
+            "el importador no reportó el mes")
+    log.add("pais_sin_x", no_x.sum(), "conservadas con NULL",
+            "Ecuador no detalló el país en el mes")
+    merged["probable_cause"] = COUNTRY_CAUSES["both"]
+    merged.loc[no_mirror, "probable_cause"] = COUNTRY_CAUSES["mirror_missing"]
+    merged.loc[no_x, "probable_cause"] = COUNTRY_CAUSES["x_missing"]
+
+    no_country = merged["country_id"].isna()
+    log.add("pais_vacio", no_country.sum(), "excluidas", "regla chk_recon_country")
+    merged = merged[~no_country]
+
+    out = merged.assign(
+        comparison_level="country",
+        country_id=merged["country_id"].astype(int),
+        source_id=mirror_id,
+        reference_source_id=x_id,
+        value_usd=merged["value_usd"].round(2),
+        reference_value_usd=merged["reference_value_usd"].round(2),
+        weight_kg=merged["weight_kg"].round(3),
+        reference_weight_kg=merged["reference_weight_kg"].round(3),
+        computed_at=datetime.now(),
+    )
+    log.add("filas_conciliacion_pais", len(out), "carga",
+            f"{out['country_id'].nunique()} países, {out['period_date'].nunique()} meses")
+    return out[["period_date", "comparison_level", "country_id", "source_id",
+                "reference_source_id", "value_usd", "reference_value_usd", "weight_kg",
+                "reference_weight_kg", "probable_cause", "computed_at"]]
+
+
 def run() -> pd.DataFrame:
     log = RuleLog()
     total = build_total_level(log)
@@ -163,6 +239,10 @@ def run() -> pd.DataFrame:
     # La llave única es (period_date, comparison_level, country_key, source_id).
     upsert(total, "silver", "source_reconciliation",
            key_cols=["period_date", "comparison_level", "source_id"])
+
+    by_country = build_country_level(log)
+    upsert(by_country, "silver", "source_reconciliation",
+           key_cols=["period_date", "comparison_level", "country_id", "source_id"])
 
     rules = log.to_frame()
     QUALITY_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -204,3 +284,46 @@ if __name__ == "__main__":
     )
     print("\nBrecha anual frente al BCE (solo meses con dato en ambas fuentes):")
     print(yearly.to_string(index=False))
+
+    # Por país: brecha del espejo frente a Ecuador, solo meses con dato en ambos lados
+    countries = read_sql(
+        """
+        SELECT c.iso3,
+               c.country_name_es                                   AS pais,
+               COUNT(*)                                            AS meses,
+               SUM(r.value_usd IS NOT NULL
+                   AND r.reference_value_usd IS NOT NULL)          AS meses_ambas,
+               SUM(r.value_usd IS NULL)                            AS sin_espejo,
+               SUM(r.reference_value_usd IS NULL)                  AS sin_x,
+               ROUND(SUM(r.reference_value_usd) / 1e6, 1)          AS ecuador_musd,
+               ROUND(SUM(CASE WHEN r.value_usd IS NOT NULL AND r.reference_value_usd IS NOT NULL
+                              THEN r.gap_usd END)
+                     / SUM(CASE WHEN r.value_usd IS NOT NULL AND r.reference_value_usd IS NOT NULL
+                                THEN r.reference_value_usd END) * 100, 1) AS brecha_pct
+        FROM silver.source_reconciliation AS r
+        JOIN silver.countries AS c ON c.country_id = r.country_id
+        WHERE r.comparison_level = 'country'
+        GROUP BY c.iso3, c.country_name_es
+        ORDER BY SUM(r.reference_value_usd) DESC
+        LIMIT 12
+        """
+    )
+    print("\nEspejo (CIF) vs Ecuador (FOB), 12 mayores destinos según Ecuador:")
+    print(countries.to_string(index=False))
+
+    china = read_sql(
+        """
+        SELECT YEAR(r.period_date)                          AS anio,
+               COUNT(*)                                     AS meses,
+               SUM(r.value_usd IS NULL)                     AS meses_sin_espejo,
+               ROUND(SUM(r.reference_value_usd) / 1e6, 1)   AS ecuador_musd,
+               ROUND(SUM(r.value_usd) / 1e6, 1)             AS espejo_musd
+        FROM silver.source_reconciliation AS r
+        JOIN silver.countries AS c ON c.country_id = r.country_id
+        WHERE r.comparison_level = 'country' AND c.iso3 = 'CHN'
+        GROUP BY YEAR(r.period_date)
+        ORDER BY anio
+        """
+    )
+    print("\nChina por año (se espera espejo vacío en 2025-2026):")
+    print(china.to_string(index=False))
