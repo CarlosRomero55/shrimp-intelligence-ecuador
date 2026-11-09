@@ -131,10 +131,13 @@ def clean(raw: pd.DataFrame, log: RuleLog) -> pd.DataFrame:
     log.add("excluir_desgloses", detail.sum(), "excluidas", "partner2≠0, customs≠C00 o mot≠0")
     df = df[~detail]
 
-    # R5: valor en USD (texto → número); sin valor o negativo no sirve
+    # R5: valor en USD (texto → número); sin valor, cero o negativo no sirve.
+    # Cero también se excluye (Fase 6): no aporta valor y daría USD/lb = 0 en gold.
+    # Se evalúa ya redondeado a centavos: 0,004 USD se guardaría como 0,00.
     df = df.assign(value_usd=_to_number(df["primary_value"]))
-    bad_value = df["value_usd"].isna() | (df["value_usd"] < 0)
-    log.add("valor_invalido", bad_value.sum(), "excluidas", "primary_value vacío o < 0")
+    bad_value = df["value_usd"].isna() | (df["value_usd"].round(2) <= 0)
+    log.add("valor_invalido", bad_value.sum(), "excluidas",
+            "primary_value vacío, cero o negativo (en centavos)")
     df = df[~bad_value]
 
     # R6: peso neto en kg (texto → número); vacío se permite, negativo pasa a vacío
