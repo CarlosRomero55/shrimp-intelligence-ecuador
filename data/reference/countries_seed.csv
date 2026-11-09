@@ -1,0 +1,111 @@
+iso3,m49_code,country_name_es,country_name_en,region_m49,comtrade_codes
+ABW,533,Aruba,Aruba,419,533
+ALB,8,Albania,Albania,150,8
+ARE,784,Emiratos Árabes Unidos,United Arab Emirates,142,784
+ARG,32,Argentina,Argentina,419,32
+ARM,51,Armenia,Armenia,142,51
+AUS,36,Australia,Australia,009,36
+AUT,40,Austria,Austria,150,40
+AZE,31,Azerbaiyán,Azerbaijan,142,31
+BEL,56,Bélgica,Belgium,150,56
+BGR,100,Bulgaria,Bulgaria,150,100
+BHR,48,Baréin,Bahrain,142,48
+BHS,44,Bahamas,Bahamas,419,44
+BIH,70,Bosnia y Herzegovina,Bosnia and Herzegovina,150,70
+BLR,112,Bielorrusia,Belarus,150,112
+BOL,68,Bolivia,Bolivia,419,68
+BRA,76,Brasil,Brazil,419,76
+BRN,96,Brunei Darussalam,Brunei Darussalam,142,96
+CAN,124,Canadá,Canada,021,124
+CHE,756,Suiza,Switzerland,150,757
+CHL,152,Chile,Chile,419,152
+CHN,156,China,China,142,156
+CIV,384,Costa de Marfil,Côte d'Ivoire,002,384
+COL,170,Colombia,Colombia,419,170
+CPV,132,Cabo Verde,Cabo Verde,002,132
+CRI,188,Costa Rica,Costa Rica,419,188
+CYP,196,Chipre,Cyprus,142,196
+CZE,203,Chequia,Czechia,150,203
+DEU,276,Alemania,Germany,150,276
+DNK,208,Dinamarca,Denmark,150,208
+DOM,214,República Dominicana,Dominican Republic,419,214
+EGY,818,Egipto,Egypt,002,818
+ESP,724,España,Spain,150,724
+EST,233,Estonia,Estonia,150,233
+FIN,246,Finlandia,Finland,150,246
+FRA,250,Francia,France,150,251
+FRO,234,Islas Feroe,Faroe Islands,150,234
+GAB,266,Gabón,Gabon,002,266
+GBR,826,Reino Unido,United Kingdom,150,826
+GEO,268,Georgia,Georgia,142,268
+GRC,300,Grecia,Greece,150,300
+GTM,320,Guatemala,Guatemala,419,320
+HKG,344,Hong Kong,Hong Kong,142,344
+HRV,191,Croacia,Croatia,150,191
+HUN,348,Hungría,Hungary,150,348
+IDN,360,Indonesia,Indonesia,142,360
+IND,356,India,India,142,699
+IRL,372,Irlanda,Ireland,150,372
+ISL,352,Islandia,Iceland,150,352
+ISR,376,Israel,Israel,142,376
+ITA,380,Italia,Italy,150,380
+JOR,400,Jordania,Jordan,142,400
+JPN,392,Japón,Japan,142,392
+KAZ,398,Kazajistán,Kazakhstan,142,398
+KEN,404,Kenia,Kenya,002,404
+KOR,410,Corea del Sur,South Korea,142,410
+KWT,414,Kuwait,Kuwait,142,414
+LBN,422,Líbano,Lebanon,142,422
+LBY,434,Libia,Libya,002,434
+LKA,144,Sri Lanka,Sri Lanka,142,144
+LTU,440,Lituania,Lithuania,150,440
+LUX,442,Luxemburgo,Luxembourg,150,442
+LVA,428,Letonia,Latvia,150,428
+MAC,446,Macao,Macau,142,446
+MAR,504,Marruecos,Morocco,002,504
+MDA,498,Moldavia,Moldova,150,498
+MEX,484,México,Mexico,419,484
+MKD,807,Macedonia del Norte,North Macedonia,150,807
+MLT,470,Malta,Malta,150,470
+MMR,104,Myanmar,Myanmar,142,104
+MNE,499,Montenegro,Montenegro,150,499
+MNG,496,Mongolia,Mongolia,142,496
+MUS,480,Mauricio,Mauritius,002,480
+MWI,454,Malaui,Malawi,002,454
+MYS,458,Malasia,Malaysia,142,458
+NAM,516,Namibia,Namibia,002,516
+NIC,558,Nicaragua,Nicaragua,419,558
+NLD,528,Países Bajos,Netherlands,150,528
+NOR,578,Noruega,Norway,150,579
+NZL,554,Nueva Zelanda,New Zealand,009,554
+OMN,512,Omán,Oman,142,512
+PAN,591,Panamá,Panama,419,591
+PER,604,Perú,Peru,419,604
+PHL,608,Filipinas,Philippines,142,608
+POL,616,Polonia,Poland,150,616
+PRT,620,Portugal,Portugal,150,620
+PRY,600,Paraguay,Paraguay,419,600
+PYF,258,Polinesia Francesa,French Polynesia,009,258
+QAT,634,Catar,Qatar,142,634
+ROU,642,Rumanía,Romania,150,642
+RUS,643,Rusia,Russia,150,643
+SAU,682,Arabia Saudí,Saudi Arabia,142,682
+SGP,702,Singapur,Singapore,142,702
+SLV,222,El Salvador,El Salvador,419,222
+SRB,688,Serbia,Serbia,150,688
+SVK,703,Eslovaquia,Slovakia,150,703
+SVN,705,Eslovenia,Slovenia,150,705
+SWE,752,Suecia,Sweden,150,752
+SYC,690,Seychelles,Seychelles,002,690
+THA,764,Tailandia,Thailand,142,764
+TTO,780,Trinidad y Tobago,Trinidad and Tobago,419,780
+TUN,788,Túnez,Tunisia,002,788
+TUR,792,Turquía,Türkiye,142,792
+TWN,158,Taiwán,Taiwan,142,490
+UKR,804,Ucrania,Ukraine,150,804
+URY,858,Uruguay,Uruguay,419,858
+USA,840,Estados Unidos,United States,021,842
+UZB,860,Uzbekistán,Uzbekistan,142,860
+VNM,704,Vietnam,Vietnam,142,704
+ZAF,710,Sudáfrica,South Africa,002,710
+ZMB,894,Zambia,Zambia,002,894

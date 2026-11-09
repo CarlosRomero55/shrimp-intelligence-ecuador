@@ -1,0 +1,313 @@
+alias_text,iso3,seen_in_source
+abw,ABW,ISO_3166
+aruba,ABW,ISO_3166
+alb,ALB,ISO_3166
+albania,ALB,ISO_3166
+are,ARE,ISO_3166
+emiratos arabes unidos,ARE,ISO_3166
+united arab emirates,ARE,ISO_3166
+arg,ARG,ISO_3166
+argentina,ARG,ISO_3166
+arm,ARM,ISO_3166
+armenia,ARM,ISO_3166
+aus,AUS,ISO_3166
+australia,AUS,ISO_3166
+austria,AUT,ISO_3166
+aut,AUT,ISO_3166
+aze,AZE,ISO_3166
+azerbaijan,AZE,ISO_3166
+azerbaiyan,AZE,ISO_3166
+bel,BEL,ISO_3166
+belgica,BEL,ISO_3166
+belgium,BEL,ISO_3166
+bgr,BGR,ISO_3166
+bulgaria,BGR,ISO_3166
+bahrain,BHR,ISO_3166
+barein,BHR,ISO_3166
+bhr,BHR,ISO_3166
+bahamas,BHS,ISO_3166
+bhs,BHS,ISO_3166
+bih,BIH,ISO_3166
+bosnia and herzegovina,BIH,ISO_3166
+bosnia herzegovina,BIH,UN_COMTRADE
+bosnia y herzegovina,BIH,ISO_3166
+belarus,BLR,ISO_3166
+bielorrusia,BLR,ISO_3166
+blr,BLR,ISO_3166
+bol,BOL,ISO_3166
+bolivia,BOL,ISO_3166
+bolivia (plurinational state of),BOL,UN_COMTRADE
+"bolivia, estado plurinacional de",BOL,ISO_3166
+"bolivia, plurinational state of",BOL,ISO_3166
+bra,BRA,ISO_3166
+brasil,BRA,ISO_3166
+brazil,BRA,ISO_3166
+brn,BRN,ISO_3166
+brunei darussalam,BRN,ISO_3166
+can,CAN,ISO_3166
+canada,CAN,ISO_3166
+che,CHE,ISO_3166
+suiza,CHE,ISO_3166
+switzerland,CHE,ISO_3166
+chile,CHL,ISO_3166
+chl,CHL,ISO_3166
+china,CHN,ISO_3166
+chn,CHN,ISO_3166
+civ,CIV,ISO_3166
+costa de marfil,CIV,ISO_3166
+cote d'ivoire,CIV,ISO_3166
+col,COL,ISO_3166
+colombia,COL,ISO_3166
+cabo verde,CPV,ISO_3166
+cpv,CPV,ISO_3166
+costa rica,CRI,ISO_3166
+cri,CRI,ISO_3166
+chipre,CYP,ISO_3166
+cyp,CYP,ISO_3166
+cyprus,CYP,ISO_3166
+chequia,CZE,ISO_3166
+cze,CZE,ISO_3166
+czechia,CZE,ISO_3166
+alemania,DEU,ISO_3166
+deu,DEU,ISO_3166
+germany,DEU,ISO_3166
+denmark,DNK,ISO_3166
+dinamarca,DNK,ISO_3166
+dnk,DNK,ISO_3166
+dom,DOM,ISO_3166
+dominican rep.,DOM,UN_COMTRADE
+dominican republic,DOM,ISO_3166
+republica dominicana,DOM,ISO_3166
+egipto,EGY,ISO_3166
+egy,EGY,ISO_3166
+egypt,EGY,ISO_3166
+esp,ESP,ISO_3166
+espana,ESP,ISO_3166
+spain,ESP,ISO_3166
+est,EST,ISO_3166
+estonia,EST,ISO_3166
+fin,FIN,ISO_3166
+finland,FIN,ISO_3166
+finlandia,FIN,ISO_3166
+fra,FRA,ISO_3166
+france,FRA,ISO_3166
+francia,FRA,ISO_3166
+faroe isds,FRO,UN_COMTRADE
+faroe islands,FRO,ISO_3166
+fro,FRO,ISO_3166
+islas feroe,FRO,ISO_3166
+gab,GAB,ISO_3166
+gabon,GAB,ISO_3166
+gbr,GBR,ISO_3166
+reino unido,GBR,ISO_3166
+united kingdom,GBR,ISO_3166
+geo,GEO,ISO_3166
+georgia,GEO,ISO_3166
+grc,GRC,ISO_3166
+grecia,GRC,ISO_3166
+greece,GRC,ISO_3166
+gtm,GTM,ISO_3166
+guatemala,GTM,ISO_3166
+"china, hong kong sar",HKG,UN_COMTRADE
+hkg,HKG,ISO_3166
+hong kong,HKG,ISO_3166
+croacia,HRV,ISO_3166
+croatia,HRV,ISO_3166
+hrv,HRV,ISO_3166
+hun,HUN,ISO_3166
+hungary,HUN,ISO_3166
+hungria,HUN,ISO_3166
+idn,IDN,ISO_3166
+indonesia,IDN,ISO_3166
+ind,IND,ISO_3166
+india,IND,ISO_3166
+ireland,IRL,ISO_3166
+irl,IRL,ISO_3166
+irlanda,IRL,ISO_3166
+iceland,ISL,ISO_3166
+isl,ISL,ISO_3166
+islandia,ISL,ISO_3166
+isr,ISR,ISO_3166
+israel,ISR,ISO_3166
+ita,ITA,ISO_3166
+italia,ITA,ISO_3166
+italy,ITA,ISO_3166
+jor,JOR,ISO_3166
+jordan,JOR,ISO_3166
+jordania,JOR,ISO_3166
+japan,JPN,ISO_3166
+japon,JPN,ISO_3166
+jpn,JPN,ISO_3166
+kaz,KAZ,ISO_3166
+kazajistan,KAZ,ISO_3166
+kazakhstan,KAZ,ISO_3166
+ken,KEN,ISO_3166
+kenia,KEN,ISO_3166
+kenya,KEN,ISO_3166
+corea del sur,KOR,ISO_3166
+"corea, republica de",KOR,ISO_3166
+kor,KOR,ISO_3166
+"korea, republic of",KOR,ISO_3166
+rep. of korea,KOR,UN_COMTRADE
+south korea,KOR,ISO_3166
+kuwait,KWT,ISO_3166
+kwt,KWT,ISO_3166
+lbn,LBN,ISO_3166
+lebanon,LBN,ISO_3166
+libano,LBN,ISO_3166
+lby,LBY,ISO_3166
+libia,LBY,ISO_3166
+libya,LBY,ISO_3166
+lka,LKA,ISO_3166
+sri lanka,LKA,ISO_3166
+lithuania,LTU,ISO_3166
+lituania,LTU,ISO_3166
+ltu,LTU,ISO_3166
+lux,LUX,ISO_3166
+luxembourg,LUX,ISO_3166
+luxemburgo,LUX,ISO_3166
+latvia,LVA,ISO_3166
+letonia,LVA,ISO_3166
+lva,LVA,ISO_3166
+"china, macao sar",MAC,UN_COMTRADE
+mac,MAC,ISO_3166
+macao,MAC,ISO_3166
+macau,MAC,ISO_3166
+mar,MAR,ISO_3166
+marruecos,MAR,ISO_3166
+morocco,MAR,ISO_3166
+mda,MDA,ISO_3166
+moldavia,MDA,ISO_3166
+"moldavia, republica de",MDA,ISO_3166
+moldova,MDA,ISO_3166
+"moldova, republic of",MDA,ISO_3166
+rep. of moldova,MDA,UN_COMTRADE
+mex,MEX,ISO_3166
+mexico,MEX,ISO_3166
+macedonia del norte,MKD,ISO_3166
+mkd,MKD,ISO_3166
+north macedonia,MKD,ISO_3166
+malta,MLT,ISO_3166
+mlt,MLT,ISO_3166
+birmania,MMR,ISO_3166
+mmr,MMR,ISO_3166
+myanmar,MMR,ISO_3166
+mne,MNE,ISO_3166
+montenegro,MNE,ISO_3166
+mng,MNG,ISO_3166
+mongolia,MNG,ISO_3166
+mauricio,MUS,ISO_3166
+mauritius,MUS,ISO_3166
+mus,MUS,ISO_3166
+malaui,MWI,ISO_3166
+malawi,MWI,ISO_3166
+mwi,MWI,ISO_3166
+malasia,MYS,ISO_3166
+malaysia,MYS,ISO_3166
+mys,MYS,ISO_3166
+nam,NAM,ISO_3166
+namibia,NAM,ISO_3166
+nic,NIC,ISO_3166
+nicaragua,NIC,ISO_3166
+netherlands,NLD,ISO_3166
+nld,NLD,ISO_3166
+paises bajos,NLD,ISO_3166
+nor,NOR,ISO_3166
+noruega,NOR,ISO_3166
+norway,NOR,ISO_3166
+new zealand,NZL,ISO_3166
+nueva zelanda,NZL,ISO_3166
+nzl,NZL,ISO_3166
+oman,OMN,ISO_3166
+omn,OMN,ISO_3166
+pan,PAN,ISO_3166
+panama,PAN,ISO_3166
+per,PER,ISO_3166
+peru,PER,ISO_3166
+filipinas,PHL,ISO_3166
+philippines,PHL,ISO_3166
+phl,PHL,ISO_3166
+pol,POL,ISO_3166
+poland,POL,ISO_3166
+polonia,POL,ISO_3166
+portugal,PRT,ISO_3166
+prt,PRT,ISO_3166
+paraguay,PRY,ISO_3166
+pry,PRY,ISO_3166
+french polynesia,PYF,ISO_3166
+polinesia francesa,PYF,ISO_3166
+pyf,PYF,ISO_3166
+catar,QAT,ISO_3166
+qat,QAT,ISO_3166
+qatar,QAT,ISO_3166
+romania,ROU,ISO_3166
+rou,ROU,ISO_3166
+rumania,ROU,ISO_3166
+federacion rusa,RUS,ISO_3166
+rus,RUS,ISO_3166
+rusia,RUS,ISO_3166
+russia,RUS,ISO_3166
+russian federation,RUS,ISO_3166
+arabia saudi,SAU,ISO_3166
+sau,SAU,ISO_3166
+saudi arabia,SAU,ISO_3166
+sgp,SGP,ISO_3166
+singapore,SGP,ISO_3166
+singapur,SGP,ISO_3166
+el salvador,SLV,ISO_3166
+slv,SLV,ISO_3166
+serbia,SRB,ISO_3166
+srb,SRB,ISO_3166
+eslovaquia,SVK,ISO_3166
+slovakia,SVK,ISO_3166
+svk,SVK,ISO_3166
+eslovenia,SVN,ISO_3166
+slovenia,SVN,ISO_3166
+svn,SVN,ISO_3166
+suecia,SWE,ISO_3166
+swe,SWE,ISO_3166
+sweden,SWE,ISO_3166
+seychelles,SYC,ISO_3166
+syc,SYC,ISO_3166
+tailandia,THA,ISO_3166
+tha,THA,ISO_3166
+thailand,THA,ISO_3166
+trinidad and tobago,TTO,ISO_3166
+trinidad y tobago,TTO,ISO_3166
+tto,TTO,ISO_3166
+tun,TUN,ISO_3166
+tunez,TUN,ISO_3166
+tunisia,TUN,ISO_3166
+tur,TUR,ISO_3166
+turkiye,TUR,ISO_3166
+turquia,TUR,ISO_3166
+"other asia, nes",TWN,UN_COMTRADE
+s19,TWN,UN_COMTRADE
+taiwan,TWN,ISO_3166
+"taiwan, province of china",TWN,ISO_3166
+"taiwan, provincia de china",TWN,ISO_3166
+twn,TWN,ISO_3166
+ucrania,UKR,ISO_3166
+ukr,UKR,ISO_3166
+ukraine,UKR,ISO_3166
+uruguay,URY,ISO_3166
+ury,URY,ISO_3166
+ee. uu.,USA,MANUAL
+ee.uu.,USA,MANUAL
+eeuu,USA,MANUAL
+estados unidos,USA,ISO_3166
+estados unidos de america,USA,MANUAL
+u.s.a.,USA,MANUAL
+united states,USA,ISO_3166
+united states of america,USA,MANUAL
+usa,USA,ISO_3166
+uzb,UZB,ISO_3166
+uzbekistan,UZB,ISO_3166
+viet nam,VNM,ISO_3166
+vietnam,VNM,ISO_3166
+vnm,VNM,ISO_3166
+south africa,ZAF,ISO_3166
+sudafrica,ZAF,ISO_3166
+zaf,ZAF,ISO_3166
+zambia,ZMB,ISO_3166
+zmb,ZMB,ISO_3166
