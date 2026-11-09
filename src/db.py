@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -210,6 +209,25 @@ def _table_columns(conn: Connection, schema: str, table: str) -> set[str]:
     return set(cols)
 
 
+def _generated_columns(conn: Connection, schema: str, table: str) -> set[str]:
+    """
+    Columnas GENERADAS de schema.table (MySQL las calcula; no se pueden enviar).
+    Ojo: created_at / loaded_at tienen extra = 'DEFAULT_GENERATED' (solo un valor por
+    defecto) y SÍ se pueden enviar; por eso se filtra por STORED/VIRTUAL GENERATED.
+    """
+    return set(conn.execute(
+        text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = :s AND table_name = :t
+              AND extra IN ('STORED GENERATED', 'VIRTUAL GENERATED')
+            """
+        ),
+        {"s": schema, "t": table},
+    ).scalars().all())
+
+
 def upsert(
     df: pd.DataFrame,
     schema: str,
@@ -228,6 +246,8 @@ def upsert(
     - No enviar llaves sustitutas auto_increment (ej. region_id): MySQL las asigna.
     - Los nombres de tabla/columna se validan contra information_schema antes
       de armar el SQL (no pueden ir como parámetros enlazados).
+    - Las columnas GENERADAS (ej. weight_lb, revenue_usd) no se envían: si el
+      DataFrame las trae, falla antes de escribir con un mensaje que las nombra.
     - conn: igual que en write_df (transacción externa sin commit, o propia).
 
     Devuelve {"rows": n, "inserted": nuevas, "existing": ya existían}.
@@ -256,6 +276,13 @@ def upsert(
         if unknown:
             raise ValueError(f"upsert: columnas inexistentes en {schema}.{table}: "
                              f"{sorted(unknown)}")
+
+        # 1b) Columnas generadas: MySQL las calcula y rechaza cualquier valor enviado
+        #     (error 3105, que no dice cuál columna era). Aquí se detecta antes y claro.
+        generated = set(cols) & _generated_columns(connection, schema, table)
+        if generated:
+            raise ValueError(f"upsert: {sorted(generated)} es/son columna(s) GENERADA(s) en "
+                             f"{schema}.{table}: MySQL las calcula, quítalas del DataFrame")
 
         # 2) Partes fijas del SQL (nombres ya validados, entre backticks)
         target = f"`{schema}`.`{table}`"

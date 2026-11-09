@@ -1,4 +1,3 @@
-
 import hashlib
 import logging
 import uuid
@@ -130,3 +129,11 @@ def test_upsert_rejects_unknown_column(conn):
     }])
     with pytest.raises(ValueError, match="columna_falsa"):
         upsert(df, "silver", "regions", key_cols=["m49_region_code"], conn=conn)
+
+
+def test_upsert_rejects_generated_column(conn):
+    """Una columna GENERADA (hs_heading = primeros 4 dígitos de hs_code) debe detener
+    la carga con un mensaje que la nombre, antes de que MySQL responda el error 3105."""
+    df = pd.DataFrame([{"hs_code": "030617", "hs_heading": "0306"}])
+    with pytest.raises(ValueError, match=r"hs_heading.*GENERADA"):
+        upsert(df, "silver", "products", key_cols=["hs_code"], conn=conn)
