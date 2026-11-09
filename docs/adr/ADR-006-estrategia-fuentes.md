@@ -47,3 +47,63 @@ Restricción adicional: usar solo fuentes **gratuitas**.
 - (−) La distribución por país en los huecos es una **estimación**; la regla exacta
   (por ejemplo, total BCE × participación del espejo) se decide y documenta en las Fases 5 y 7.
 - (−) El BCE requiere descarga manual (ver `docs/fuentes/bce_descarga_manual.md`).
+## Adenda (2026-11-09): completitud del espejo
+
+La conciliación a nivel total (silver.source_reconciliation) mostró que el espejo NO está
+completo en todos los años, aunque tenga datos en todos los meses:
+
+| Año | Espejo vs BCE | Comtrade X vs BCE |
+|---|---|---|
+| 2018 | −37,2 % | −7,7 % |
+| 2019 | −12,9 % | −5,0 % |
+| 2020 | −5,6 % | −4,5 % |
+| 2021 | −1,7 % | −3,3 % |
+| 2022 | −6,9 % | (1 mes) −2,5 % |
+| 2023 | −9,6 % | sin dato |
+| 2024 | −14,4 % | −1,1 % |
+| 2025 | −53,1 % | sin dato |
+| 2026 (ene–ago) | −62,4 % | (3 meses) −1,6 % |
+
+Causa principal: **China no ha publicado en Comtrade sus importaciones de 2025 y 2026**
+(en 2024 registró USD 3.089 M desde Ecuador). En 2018 China también aparece muy bajo
+(USD 481 M vs 1.849 M en 2019); causa por verificar.
+
+Decisión:
+- El espejo SÍ se usa para el detalle por país en Feb 2022–Dic 2023 y Abr 2024.
+- En 2025–2026 el detalle por país del espejo NO representa la distribución real: gold
+  mostrará los países que reportaron y la diferencia con el BCE como
+  "Sin reporte por país (incluye China)"; no se estima cuánto compró China.
+- Regla en gold (Fase 7): mes con brecha de conciliación peor que −20 % → "detalle incompleto".
+- Comtrade X es consistente con el BCE (brecha −1 % a −8 %, decreciente): diferencia de
+  cobertura de producto.
+
+Lección: verificar que haya datos no basta; hay que verificar que estén COMPLETOS,
+y para eso hace falta una referencia independiente (el BCE).
+## Anexo 2026-11-09 (b) — Conciliación por país: Comtrade X vs espejo
+
+**Método.** `silver.source_reconciliation`, nivel `country`: por mes y país, lo que Ecuador declara
+(UN_COMTRADE, FOB, referencia) frente a lo que el importador declara (COMTRADE_MIRROR, CIF). Solo los
+63 meses en que Ecuador publicó. Si falta un lado, su valor queda NULL y `probable_cause` lo explica.
+Resultado: 3.682 filas, 102 países (1.822 con ambas fuentes, 680 sin espejo, 1.180 sin dato de Ecuador).
+
+**Brecha espejo vs Ecuador (meses con ambas fuentes, 12 mayores destinos):**
+
+| País | Brecha | Lectura |
+|---|---|---|
+| España, Italia, Colombia, Corea del Sur, Reino Unido | −6 % a 0 % | Coinciden |
+| Estados Unidos (+7,3 %), Rusia (+5,0 %) | positiva moderada | Coherente con CIF (flete + seguro) |
+| Francia | +22,2 % | Espejo mayor |
+| China | −6,2 % | Coinciden cuando reporta; 2026 sin espejo |
+| Países Bajos (−17,3 %), Bélgica (−80,9 %), Vietnam (−93,6 %) | muy negativa | Espejo mucho menor |
+
+**Hipótesis (NO verificadas):** Bélgica y Países Bajos como puertos de entrada a la UE (registro por país de
+procedencia y no de origen); Francia recibiría camarón ecuatoriano reexpedido desde otro país de la UE;
+Vietnam no reportó 23 de 61 meses y podría clasificar el camarón para reproceso bajo otro código HS.
+
+**China 2018 (pendiente cerrado):** Ecuador 576,0 M vs espejo 481,5 M. Ambas fuentes coinciden; no es un error.
+
+**Cambio de esquema:** `gap_pct` pasó de DECIMAL(9,4) a DECIMAL(12,4). A nivel país hay brechas mayores
+a 99.999 % (montos mínimos declarados por Ecuador frente a montos grandes del importador).
+
+**Regla para gold (Fase 7):** marcar como "detalle no comparable" el mes-país con |brecha| > 1.000 % o sin
+espejo. El total nacional siempre sale del BCE.
