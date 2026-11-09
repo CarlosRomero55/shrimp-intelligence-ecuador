@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS gold.dim_source (
     weight_unit       VARCHAR(5)    NULL,
     valuation_basis   VARCHAR(10)   NULL,
     is_simulated      BOOLEAN       NOT NULL,
-    is_reference      BOOLEAN       NOT NULL,          -- TRUE solo para UN_COMTRADE
+    is_reference      BOOLEAN       NOT NULL,          -- TRUE solo para BCE (referencia oficial, ADR-006)
     dw_loaded_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (source_key),
