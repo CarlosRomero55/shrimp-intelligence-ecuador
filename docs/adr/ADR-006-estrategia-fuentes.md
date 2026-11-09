@@ -47,3 +47,35 @@ Restricción adicional: usar solo fuentes **gratuitas**.
 - (−) La distribución por país en los huecos es una **estimación**; la regla exacta
   (por ejemplo, total BCE × participación del espejo) se decide y documenta en las Fases 5 y 7.
 - (−) El BCE requiere descarga manual (ver `docs/fuentes/bce_descarga_manual.md`).
+## Adenda (2026-11-09): completitud del espejo
+
+La conciliación a nivel total (silver.source_reconciliation) mostró que el espejo NO está
+completo en todos los años, aunque tenga datos en todos los meses:
+
+| Año | Espejo vs BCE | Comtrade X vs BCE |
+|---|---|---|
+| 2018 | −37,2 % | −7,7 % |
+| 2019 | −12,9 % | −5,0 % |
+| 2020 | −5,6 % | −4,5 % |
+| 2021 | −1,7 % | −3,3 % |
+| 2022 | −6,9 % | (1 mes) −2,5 % |
+| 2023 | −9,6 % | sin dato |
+| 2024 | −14,4 % | −1,1 % |
+| 2025 | −53,1 % | sin dato |
+| 2026 (ene–ago) | −62,4 % | (3 meses) −1,6 % |
+
+Causa principal: **China no ha publicado en Comtrade sus importaciones de 2025 y 2026**
+(en 2024 registró USD 3.089 M desde Ecuador). En 2018 China también aparece muy bajo
+(USD 481 M vs 1.849 M en 2019); causa por verificar.
+
+Decisión:
+- El espejo SÍ se usa para el detalle por país en Feb 2022–Dic 2023 y Abr 2024.
+- En 2025–2026 el detalle por país del espejo NO representa la distribución real: gold
+  mostrará los países que reportaron y la diferencia con el BCE como
+  "Sin reporte por país (incluye China)"; no se estima cuánto compró China.
+- Regla en gold (Fase 7): mes con brecha de conciliación peor que −20 % → "detalle incompleto".
+- Comtrade X es consistente con el BCE (brecha −1 % a −8 %, decreciente): diferencia de
+  cobertura de producto.
+
+Lección: verificar que haya datos no basta; hay que verificar que estén COMPLETOS,
+y para eso hace falta una referencia independiente (el BCE).
