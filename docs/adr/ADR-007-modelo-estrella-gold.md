@@ -88,4 +88,4 @@ datos, y agrega `is_comparable` (0 si falta un lado o |brecha| > 1.000 %).
 | 2023 | — | 6.513,2 | 692,0 | 7.205,2 |
 | 2025 | — | 3.938,7 | 4.462,6 | 8.401,3 |
 
-Millones de USD. Fuentes: UN Comtrade (X y espejo) y Banco Central del Ecuador (cuadro 3.1.2).
+Millones de USD. Fuentes: UN Comtrade (X y espejo) y Banco Central del Ecuador (cuadro 3.1.2).  
