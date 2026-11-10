@@ -26,4 +26,5 @@ uvicorn[standard]>=0.29
 
 # ===== EDA (Fase 10) =====
 jupyter>=1.0
-matplotlib>=3.8
+matplotlib==3.11.2
+ipykernel==7.4.0

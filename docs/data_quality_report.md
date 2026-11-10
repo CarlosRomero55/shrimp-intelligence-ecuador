@@ -1,6 +1,6 @@
 # Reporte de calidad de datos — Shrimp Intelligence Ecuador
 
-_Generado automáticamente por `src/quality_report.py` el 2026-11-09 18:04. No editar a mano: volver a ejecutar el script después de cada carga._
+_Generado automáticamente por `src/quality_report.py` el 2026-11-09 18:20. No editar a mano: volver a ejecutar el script después de cada carga._
 
 Datos **reales**: UN Comtrade (Ecuador y espejo) y Banco Central del Ecuador. Datos **SIMULADOS**: finca "Acuícola Del Golfo S.A." (semilla fija 42).
 
