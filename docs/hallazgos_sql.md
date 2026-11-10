@@ -1,5 +1,7 @@
 # Hallazgos de las consultas SQL de negocio (Fase 9)
 
+Gráficos de estos hallazgos: `notebooks/01_eda_exportaciones.ipynb` (ver `notebooks/README.md`).
+
 Consultas en `sql/queries/` · se ejecutan con `python -m src.run_queries` · resultados en
 `data/processed/queries/*.csv`. Cifras del 2026-11-10 (BCE publicado hasta agosto de 2026).
 
@@ -31,9 +33,9 @@ Consultas en `sql/queries/` · se ejecutan con `python -m src.run_queries` · re
 
 | # | Pregunta | Hallazgo |
 |---|---|---|
-| q07 | ¿Qué piscinas son más rentables? | Margen por piscina **39–48 %**. La diferencia la explica más el **precio por libra** (1,63–1,84) que el **costo** (0,95–1,03): las mejores piscinas venden mejor (talla y momento). |
-| q08 | ¿Quién convierte mejor el alimento? | FCR **1,24–1,33**, poca dispersión. El mejor FCR no coincide con el mejor margen (GY-P07: 1.º en FCR, cuartil 3 en margen). |
-| q09 | ¿Cuánto vale la talla? | **La talla es el principal motor del margen:** 20/30 → índice de precio 127, margen 54,6 %; 40/50 → 93 y 37,2 %; 50/60 → 83 y 27,8 %. Pasar de 40/50 a 30/40 cuesta ~8 días más y suma ~10 puntos de margen (controlando el año). |
+| q07 | ¿Qué piscinas son más rentables? | Margen por piscina **37–48 %** (45 piscinas). La diferencia la explica el **precio por libra** (1,62–1,84; correlación con el margen r = 0,90) más que el **costo** (0,95–1,04): las mejores piscinas venden mejor (talla y momento). |
+| q08 | ¿Quién convierte mejor el alimento? | FCR **1,24–1,35**, poca dispersión; casi no explica el margen (r = −0,14). El mejor FCR no coincide con el mejor margen: GY-P07 y SE-P11 empatan en 1.º (1,241) y quedan en los cuartiles 3 y 2 de margen. |
+| q09 | ¿Cuánto vale la talla? | **La talla es el principal motor del margen:** 20/30 → índice de precio 127, margen 54,6 %; 40/50 → 93 y 37,2 %; 50/60 → 82,5 y 27,8 %. Las tallas 60/70 y 80/100 tienen 4 y 1 ciclos (referencia, no conclusión). Pasar de 40/50 a 30/40 cuesta ~8 días más y suma ~10 puntos de margen (controlando el año). |
 | q10 | ¿Qué finca es más productiva? | Las tres son parecidas (4.800–6.300 lb/ha/ciclo, supervivencia 70–75 %, FCR 1,27–1,31). El margen sigue al **año** (bajo en 2023–2024, alto en 2025–2026): efecto del precio de mercado. |
 
 ## Conciliación de fuentes
