@@ -68,6 +68,8 @@ class Settings:
     db_password: str = field(repr=False)          # repr=False: nunca se imprime
     comtrade_api_key: str | None = field(default=None, repr=False)
     log_level: str = "INFO"
+    api_db_user: str | None = None                # usuario de solo lectura de la API (Fase 11)
+    api_db_password: str | None = field(default=None, repr=False)
 
     def require_comtrade_key(self) -> str:
         """Exige la llave de Comtrade solo cuando se va a usar (Fase 4)."""
@@ -77,6 +79,15 @@ class Settings:
                 "Obtén la llave gratuita en comtradedeveloper.un.org."
             )
         return self.comtrade_api_key
+
+    def require_api_credentials(self) -> tuple[str, str]:
+        """Exige el usuario de solo lectura solo cuando arranca la API (Fase 11)."""
+        if not self.api_db_user or not self.api_db_password:
+            raise RuntimeError(
+                "Faltan API_DB_USER y/o API_DB_PASSWORD en el archivo .env "
+                "(usuario de solo lectura de la API; ver .env.example)."
+            )
+        return self.api_db_user, self.api_db_password
 
 
 # Variables obligatorias: sin ellas el pipeline no puede arrancar
@@ -99,6 +110,8 @@ def get_settings() -> Settings:
         db_password=os.environ["DB_PASSWORD"],
         comtrade_api_key=os.getenv("COMTRADE_API_KEY") or None,
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        api_db_user=os.getenv("API_DB_USER") or None,
+        api_db_password=os.getenv("API_DB_PASSWORD") or None,
     )
 
 
@@ -118,6 +131,8 @@ if __name__ == "__main__":
     print(f"MySQL             : {settings.db_user}@{settings.db_host}:{settings.db_port}"
           f" | password cargada: {bool(settings.db_password)}")
     print(f"Llave Comtrade    : {bool(settings.comtrade_api_key)}")
+    print(f"Usuario API       : {settings.api_db_user or '(falta)'}"
+          f" | password cargada: {bool(settings.api_db_password)}")
     print(f"Esquemas          : {', '.join(project.schemas)}")
     print(f"Partidas HS       : {', '.join(project.hs_codes)}"
           f" | Periodo: {project.start_year}–{project.end_year}")
