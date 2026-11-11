@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "811f252415095d45a263",
+  "position": {
+    "x": 707.69230769230762,
+    "y": 467.30769230769226,
+    "z": 7,
+    "height": 465.38461538461536,
+    "width": 1101.9230769230769,
+    "tabOrder": 7
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_date"
+                    }
+                  },
+                  "Property": "calendar_year"
+                }
+              },
+              "queryRef": "Sum(dim_date.calendar_year)",
+              "nativeQueryRef": "calendar_year"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Brecha Ecuador vs BCE %"
+                }
+              },
+              "queryRef": "_Medidas.Brecha Ecuador vs BCE %",
+              "nativeQueryRef": "Brecha Ecuador vs BCE %"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Brecha espejo vs BCE %"
+                }
+              },
+              "queryRef": "_Medidas.Brecha espejo vs BCE %",
+              "nativeQueryRef": "Brecha espejo vs BCE %"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

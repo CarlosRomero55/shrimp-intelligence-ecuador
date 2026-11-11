@@ -9682,6 +9682,184 @@ cultureInfo es-MX
 			          }
 			        }
 			      ]
+			    },
+			    "entity__medida.valor_ecuador_x_USD": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "_Medidas",
+			          "ConceptualProperty": "Valor Ecuador X USD"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "valor ecuador x USD": {
+			            "State": "Generated"
+			          }
+			        },
+			        {
+			          "USD": {
+			            "State": "Generated",
+			            "Weight": 0.97
+			          }
+			        },
+			        {
+			          "x USD": {
+			            "State": "Generated",
+			            "Weight": 0.97
+			          }
+			        },
+			        {
+			          "ecuador x USD": {
+			            "State": "Generated",
+			            "Weight": 0.97
+			          }
+			        }
+			      ]
+			    },
+			    "entity__medida.valor_espejo_USD": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "_Medidas",
+			          "ConceptualProperty": "Valor espejo USD"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "valor espejo USD": {
+			            "State": "Generated"
+			          }
+			        }
+			      ]
+			    },
+			    "entity__medida.brecha_ecuador_vs_BCE_": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "_Medidas",
+			          "ConceptualProperty": "Brecha Ecuador vs BCE %"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "brecha ecuador vs BCE %": {
+			            "State": "Generated"
+			          }
+			        },
+			        {
+			          "brecha ecuador vs bce percentage": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.78
+			          }
+			        },
+			        {
+			          "brecha ecuador vs bce pct": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.757
+			          }
+			        },
+			        {
+			          "Ecuador declara (FOB)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "entity__medida.brecha_espejo_vs_BCE_": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "_Medidas",
+			          "ConceptualProperty": "Brecha espejo vs BCE %"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "brecha espejo vs BCE %": {
+			            "State": "Generated"
+			          }
+			        },
+			        {
+			          "brecha espejo vs bce percentage": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.78
+			          }
+			        },
+			        {
+			          "brecha espejo vs bce pct": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.757
+			          }
+			        },
+			        {
+			          "Compradores declaran (espejo, CIF)": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
+			        }
+			      ]
+			    },
+			    "entity__medida.brecha_espejo_vs_ecuador_": {
+			      "Definition": {
+			        "Binding": {
+			          "ConceptualEntity": "_Medidas",
+			          "ConceptualProperty": "Brecha espejo vs Ecuador %"
+			        }
+			      },
+			      "State": "Generated",
+			      "Terms": [
+			        {
+			          "brecha espejo vs ecuador %": {
+			            "State": "Generated"
+			          }
+			        },
+			        {
+			          "brecha espejo vs ecuador percentage": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.78
+			          }
+			        },
+			        {
+			          "brecha espejo vs ecuador pct": {
+			            "Type": "Noun",
+			            "State": "Suggested",
+			            "Source": {
+			              "Agent": "Thesaurus"
+			            },
+			            "Weight": 0.757
+			          }
+			        }
+			      ]
 			    }
 			  },
 			  "Relationships": {
@@ -9774,6 +9952,270 @@ cultureInfo es-MX
 			          "State": "Generated",
 			          "Weight": 0.99,
 			          "ID": "dim_countries_have_fact_exports"
+			        }
+			      ]
+			    },
+			    "fact_export_has_entity__medida_brecha_espejo_vs_ecuador_": {
+			      "Binding": {
+			        "ConceptualEntity": "fact_exports"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "fact_export": {
+			          "Target": {
+			            "Entity": "fact_export"
+			          }
+			        },
+			        "entity__medida.brecha_espejo_vs_ecuador_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_espejo_vs_ecuador_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "fact_export"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_espejo_vs_ecuador_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "fact_exports_have_brecha_espejo_vs_ecuador_"
+			        }
+			      ]
+			    },
+			    "dim_date_has_entity__medida_brecha_espejo_vs_ecuador_": {
+			      "Binding": {
+			        "ConceptualEntity": "dim_date"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "dim_date": {
+			          "Target": {
+			            "Entity": "dim_date"
+			          }
+			        },
+			        "entity__medida.brecha_espejo_vs_ecuador_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_espejo_vs_ecuador_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "dim_date"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_espejo_vs_ecuador_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "dim_dates_have_brecha_espejo_vs_ecuador_"
+			        }
+			      ]
+			    },
+			    "fact_export_has_entity__medida_brecha_espejo_vs_BCE_": {
+			      "Binding": {
+			        "ConceptualEntity": "fact_exports"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "fact_export": {
+			          "Target": {
+			            "Entity": "fact_export"
+			          }
+			        },
+			        "entity__medida.brecha_espejo_vs_BCE_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_espejo_vs_BCE_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "fact_export"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_espejo_vs_BCE_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "fact_exports_have_brecha_espejo_vs_BCE_"
+			        }
+			      ]
+			    },
+			    "dim_date_has_entity__medida_brecha_espejo_vs_BCE_": {
+			      "Binding": {
+			        "ConceptualEntity": "dim_date"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "dim_date": {
+			          "Target": {
+			            "Entity": "dim_date"
+			          }
+			        },
+			        "entity__medida.brecha_espejo_vs_BCE_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_espejo_vs_BCE_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "dim_date"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_espejo_vs_BCE_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "dim_dates_have_brecha_espejo_vs_BCE_"
+			        }
+			      ]
+			    },
+			    "fact_export_has_entity__medida_brecha_ecuador_vs_BCE_": {
+			      "Binding": {
+			        "ConceptualEntity": "fact_exports"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "fact_export": {
+			          "Target": {
+			            "Entity": "fact_export"
+			          }
+			        },
+			        "entity__medida.brecha_ecuador_vs_BCE_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_ecuador_vs_BCE_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "fact_export"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_ecuador_vs_BCE_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "fact_exports_have_brecha_ecuador_vs_BCE_"
+			        }
+			      ]
+			    },
+			    "dim_date_has_entity__medida_brecha_ecuador_vs_BCE_": {
+			      "Binding": {
+			        "ConceptualEntity": "dim_date"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "dim_date": {
+			          "Target": {
+			            "Entity": "dim_date"
+			          }
+			        },
+			        "entity__medida.brecha_ecuador_vs_BCE_": {
+			          "Target": {
+			            "Entity": "entity__medida.brecha_ecuador_vs_BCE_"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "dim_date"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.brecha_ecuador_vs_BCE_"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "dim_dates_have_brecha_ecuador_vs_BCE_"
+			        }
+			      ]
+			    },
+			    "fact_export_has_entity__medida_valor_espejo_USD": {
+			      "Binding": {
+			        "ConceptualEntity": "fact_exports"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "fact_export": {
+			          "Target": {
+			            "Entity": "fact_export"
+			          }
+			        },
+			        "entity__medida.valor_espejo_USD": {
+			          "Target": {
+			            "Entity": "entity__medida.valor_espejo_USD"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "fact_export"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.valor_espejo_USD"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "fact_exports_have_valor_espejo_USD"
+			        }
+			      ]
+			    },
+			    "fact_export_has_entity__medida_valor_ecuador_x_USD": {
+			      "Binding": {
+			        "ConceptualEntity": "fact_exports"
+			      },
+			      "State": "Generated",
+			      "Roles": {
+			        "fact_export": {
+			          "Target": {
+			            "Entity": "fact_export"
+			          }
+			        },
+			        "entity__medida.valor_ecuador_x_USD": {
+			          "Target": {
+			            "Entity": "entity__medida.valor_ecuador_x_USD"
+			          }
+			        }
+			      },
+			      "Phrasings": [
+			        {
+			          "Attribute": {
+			            "Subject": {
+			              "Role": "fact_export"
+			            },
+			            "Object": {
+			              "Role": "entity__medida.valor_ecuador_x_USD"
+			            }
+			          },
+			          "State": "Generated",
+			          "Weight": 0.99,
+			          "ID": "fact_exports_have_valor_ecuador_x_USD"
 			        }
 			      ]
 			    },

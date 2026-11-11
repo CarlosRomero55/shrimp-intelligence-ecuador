@@ -321,6 +321,60 @@ table _Medidas
 			    )
 		lineageTag: ce93e34a-7817-4d5e-953c-86c5d3cfb3c3
 
+	measure 'Valor Ecuador X USD' =
+			
+			CALCULATE ( SUM ( fact_exports[value_usd] ), KEEPFILTERS ( dim_source[source_code] = "UN_COMTRADE" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Conciliación
+		lineageTag: 2703cfbf-7366-4e39-858b-e5a2633d1c56
+
+		annotation PBI_FormatHint = {"currencyCulture":"es-US"}
+
+	measure 'Valor espejo USD' =
+			
+			CALCULATE ( SUM ( fact_exports[value_usd] ), KEEPFILTERS ( dim_source[source_code] = "COMTRADE_MIRROR" ) )
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Conciliación
+		lineageTag: a1ad6231-64c4-4e0a-b0fa-0d1aa30550f4
+
+		annotation PBI_FormatHint = {"currencyCulture":"es-US"}
+
+	measure 'Brecha Ecuador vs BCE %' =
+			
+			VAR Meses = FILTER ( VALUES ( dim_date[period_key] ), NOT ISBLANK ( [Valor Ecuador X USD] ) )
+			VAR Fuente = SUMX ( Meses, [Valor Ecuador X USD] )
+			RETURN
+			    IF ( NOT ISBLANK ( Fuente ), DIVIDE ( Fuente, SUMX ( Meses, [Valor USD] ) ) - 1 )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		displayFolder: Conciliación
+		lineageTag: 07b73c5a-63ea-42d6-a9a3-090e5fe5eabb
+
+	measure 'Brecha espejo vs BCE %' = ```
+			
+			VAR Meses = FILTER ( VALUES ( dim_date[period_key] ), NOT ISBLANK ( [Valor espejo USD] ) )
+			VAR Fuente = SUMX ( Meses, [Valor espejo USD] )
+			RETURN
+			    IF ( NOT ISBLANK ( Fuente ), DIVIDE ( Fuente, SUMX ( Meses, [Valor USD] ) ) - 1 )
+			
+			```
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		displayFolder: Conciliación
+		lineageTag: ac768c47-6af6-4e3f-a8fd-6c6865ffcd41
+
+	measure 'Brecha espejo vs Ecuador %' =
+			
+			VAR Meses =
+			    FILTER (
+			        VALUES ( dim_date[period_key] ),
+			        NOT ISBLANK ( [Valor Ecuador X USD] ) && NOT ISBLANK ( [Valor espejo USD] )
+			    )
+			VAR Espejo = SUMX ( Meses, [Valor espejo USD] )
+			RETURN
+			    IF ( NOT ISBLANK ( Espejo ), DIVIDE ( Espejo, SUMX ( Meses, [Valor Ecuador X USD] ) ) - 1 )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		displayFolder: Conciliación
+		lineageTag: 40fb2517-46d9-42e3-9166-ea047ffeebab
+
 	column Value
 		formatString: 0
 		lineageTag: 0717ee49-74dd-4483-a8e8-55c6ebbefc20
