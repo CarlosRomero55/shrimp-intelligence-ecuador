@@ -2694,6 +2694,16 @@ cultureInfo es-MX
 			            },
 			            "Weight": 0.75
 			          }
+			        },
+			        {
+			          "Piscina": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
 			        }
 			      ],
 			      "NameType": "Identifier"
@@ -2866,6 +2876,16 @@ cultureInfo es-MX
 			              "Agent": "Thesaurus"
 			            },
 			            "Weight": 0.466
+			          }
+			        },
+			        {
+			          "Sede": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
 			          }
 			        }
 			      ]
@@ -9028,6 +9048,16 @@ cultureInfo es-MX
 			            },
 			            "Weight": 0.739
 			          }
+			        },
+			        {
+			          "Margen": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
 			        }
 			      ]
 			    },
@@ -9096,6 +9126,16 @@ cultureInfo es-MX
 			            },
 			            "Weight": 0.727
 			          }
+			        },
+			        {
+			          "Supervivencia": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
 			        }
 			      ]
 			    },
@@ -9128,6 +9168,16 @@ cultureInfo es-MX
 			          "costo por libra finca": {
 			            "State": "Generated"
 			          }
+			        },
+			        {
+			          "Costo/lb": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
+			          }
 			        }
 			      ]
 			    },
@@ -9143,6 +9193,16 @@ cultureInfo es-MX
 			        {
 			          "precio por libra finca": {
 			            "State": "Generated"
+			          }
+			        },
+			        {
+			          "Precio/lb": {
+			            "State": "Suggested",
+			            "Source": {
+			              "Type": "External",
+			              "Agent": "PowerBI.VisualColumnRename"
+			            },
+			            "Weight": 0.9
 			          }
 			        }
 			      ]

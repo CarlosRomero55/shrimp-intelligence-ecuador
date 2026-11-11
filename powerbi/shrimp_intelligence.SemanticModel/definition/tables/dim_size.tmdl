@@ -15,6 +15,9 @@ table dim_size
 		lineageTag: 3d13d13d-41e3-46dc-a5c5-7cba42959842
 		summarizeBy: none
 		sourceColumn: size_code
+		sortByColumn: sort_order
+
+		changedProperty = SortByColumn
 
 		annotation SummarizationSetBy = Automatic
 
