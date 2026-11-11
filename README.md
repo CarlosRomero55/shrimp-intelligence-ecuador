@@ -178,7 +178,7 @@ shrimp-intelligence-ecuador/
 
 **Carlos Romero** · Ingeniero en Tecnologías de la Información · Business Intelligence, Ciencia de Datos y Automatización · Guayaquil, Ecuador
 
-[LinkedIn](https://www.linkedin.com/in/TU-PERFIL) · [GitHub](https://github.com/CarlosRomero55)
+[LinkedIn](https://www.linkedin.com/in/carlos-romero-data/) · [GitHub](https://github.com/CarlosRomero55)
 
 ---
 
