@@ -1,0 +1,106 @@
+table fact_exports
+	lineageTag: 64d153c1-229e-4e0b-aea9-481e9ca36c6c
+
+	column date_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 515aab2a-81df-4e2c-8559-6d995f416b9c
+		summarizeBy: none
+		sourceColumn: date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column country_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 8a4fbb66-ab22-45a7-ad99-9b19ef901b54
+		summarizeBy: none
+		sourceColumn: country_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_key
+		dataType: int64
+		formatString: 0
+		lineageTag: ab9e2da7-ba46-428c-adad-dacdc8fd9b14
+		summarizeBy: none
+		sourceColumn: product_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 48af1868-71eb-498f-9dbc-f0cad05df8fc
+		summarizeBy: none
+		sourceColumn: source_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_preferred
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 523c05c1-8439-4c18-9d65-3f1cfd3755dc
+		summarizeBy: none
+		sourceColumn: is_preferred
+
+		annotation SummarizationSetBy = Automatic
+
+	column value_usd
+		dataType: double
+		lineageTag: 5d640095-5c70-490a-b89b-de99fa2a9ff7
+		summarizeBy: sum
+		sourceColumn: value_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column weight_kg
+		dataType: double
+		lineageTag: 9dc4ddb0-c540-444d-9d4a-a08ad780c5da
+		summarizeBy: sum
+		sourceColumn: weight_kg
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column weight_lb
+		dataType: double
+		lineageTag: 2019ca33-d2a1-4a6c-95a1-065aa4ca5358
+		summarizeBy: sum
+		sourceColumn: weight_lb
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column source_batch_id
+		dataType: string
+		lineageTag: 2baff6b3-15d9-4298-ad75-f1aa7e0fa21d
+		summarizeBy: none
+		sourceColumn: source_batch_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 630ef6c1-935c-4e8d-a890-5821954baee7
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_exports = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "fact_exports"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

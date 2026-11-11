@@ -1,0 +1,212 @@
+table fact_production
+	lineageTag: 18c226d5-1f91-4af9-ab7d-66a940d2d8cd
+
+	column cycle_key
+		dataType: int64
+		formatString: 0
+		lineageTag: b24323d6-ab42-4381-8a54-0bd2397ab8c4
+		summarizeBy: sum
+		sourceColumn: cycle_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column cycle_code
+		dataType: string
+		lineageTag: a7fbdc95-7417-4837-a297-8cfa2f460f04
+		summarizeBy: none
+		sourceColumn: cycle_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column pond_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 2acab8d9-b293-4e07-b7ac-e9d72c1fb8c1
+		summarizeBy: none
+		sourceColumn: pond_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column stocking_date_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 9b7a69b2-f697-4297-aa62-dbb018fd09bd
+		summarizeBy: sum
+		sourceColumn: stocking_date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column harvest_date_key
+		dataType: int64
+		formatString: 0
+		lineageTag: e252cc56-1570-4b42-957c-ea9d124b356f
+		summarizeBy: none
+		sourceColumn: harvest_date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column size_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 46854221-86f0-4b80-9bea-51e4f65b5e23
+		summarizeBy: none
+		sourceColumn: size_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column days_of_culture
+		dataType: int64
+		formatString: 0
+		lineageTag: d348f907-8162-4bed-bf4b-f292652f0cdb
+		summarizeBy: sum
+		sourceColumn: days_of_culture
+
+		annotation SummarizationSetBy = Automatic
+
+	column num_harvests
+		dataType: int64
+		formatString: 0
+		lineageTag: 57061e67-5270-4122-bf6e-a2401bac6ace
+		summarizeBy: sum
+		sourceColumn: num_harvests
+
+		annotation SummarizationSetBy = Automatic
+
+	column area_ha
+		dataType: double
+		lineageTag: fd1e65d4-54fd-4f7f-b204-a05d8f92fa7a
+		summarizeBy: sum
+		sourceColumn: area_ha
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column larvae_stocked
+		dataType: int64
+		formatString: 0
+		lineageTag: ddf2c875-4ed6-4d8d-88b1-fdfd281561fc
+		summarizeBy: sum
+		sourceColumn: larvae_stocked
+
+		annotation SummarizationSetBy = Automatic
+
+	column harvested_animals
+		dataType: int64
+		formatString: 0
+		lineageTag: 1c6a38cc-5848-4b07-878e-c662b18b95c7
+		summarizeBy: sum
+		sourceColumn: harvested_animals
+
+		annotation SummarizationSetBy = Automatic
+
+	column harvested_kg
+		dataType: double
+		lineageTag: 8f6778f2-c45e-4c63-b2ff-74bf9d0344f9
+		summarizeBy: sum
+		sourceColumn: harvested_kg
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column harvested_lb
+		dataType: double
+		lineageTag: 84526737-49ba-460a-8224-b58234010e56
+		summarizeBy: sum
+		sourceColumn: harvested_lb
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column feed_kg
+		dataType: double
+		lineageTag: a0204f63-9f5c-4ebe-82a3-d172b899ca46
+		summarizeBy: sum
+		sourceColumn: feed_kg
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column cost_larvae_usd
+		dataType: double
+		lineageTag: 446509d6-15ff-4780-9128-27ec939826cb
+		summarizeBy: sum
+		sourceColumn: cost_larvae_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column cost_feed_usd
+		dataType: double
+		lineageTag: fa7261f5-7c73-4510-8e4f-9f01e409f9c9
+		summarizeBy: sum
+		sourceColumn: cost_feed_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column cost_energy_usd
+		dataType: double
+		lineageTag: 306e5c07-8eb8-406b-86f2-6738185df1c4
+		summarizeBy: sum
+		sourceColumn: cost_energy_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column cost_labor_usd
+		dataType: double
+		lineageTag: ce1129cb-2fba-45f9-9050-be163bc77847
+		summarizeBy: sum
+		sourceColumn: cost_labor_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column total_cost_usd
+		dataType: double
+		lineageTag: 3f174b18-43b7-48b6-89bf-5ffd1b298bae
+		summarizeBy: sum
+		sourceColumn: total_cost_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column revenue_usd
+		dataType: double
+		lineageTag: 77301939-c81b-4f31-9231-e1819bacd1df
+		summarizeBy: sum
+		sourceColumn: revenue_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 452fa974-72c2-49b6-9d72-9f45cb239238
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_production = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "fact_production"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

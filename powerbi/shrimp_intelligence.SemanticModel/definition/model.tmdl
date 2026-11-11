@@ -1,0 +1,29 @@
+model Model
+	culture: es-MX
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: es-EC
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_QueryOrder = ["dim_country","dim_date","dim_pond","dim_product","dim_size","dim_source","fact_exports","fact_production"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table dim_country
+ref table dim_date
+ref table dim_pond
+ref table dim_product
+ref table dim_size
+ref table dim_source
+ref table fact_exports
+ref table fact_production
+ref table _Medidas
+ref table 'Variación precio %'
+ref table 'Variación volumen %'
+
+ref cultureInfo es-MX
+

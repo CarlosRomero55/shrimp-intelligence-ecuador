@@ -1,0 +1,80 @@
+table dim_product
+	lineageTag: f632e1af-cd6f-4ced-90de-6862a73cfb74
+
+	column product_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 73d0069e-ec6d-4922-884e-67c27ccea20a
+		summarizeBy: none
+		sourceColumn: product_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column hs_code
+		dataType: string
+		lineageTag: 95da31f8-7c4c-45f1-b0ac-249d9718895f
+		summarizeBy: none
+		sourceColumn: hs_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column hs_heading
+		dataType: string
+		lineageTag: 1ff9713f-d3d4-4273-8821-0033b53a3e16
+		summarizeBy: none
+		sourceColumn: hs_heading
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_category
+		dataType: string
+		lineageTag: caa6e378-b6f6-4a23-a050-07f36e577c4c
+		summarizeBy: none
+		sourceColumn: product_category
+
+		annotation SummarizationSetBy = Automatic
+
+	column category_name_es
+		dataType: string
+		lineageTag: 316a7982-523c-405b-8afb-b442667e38d7
+		summarizeBy: none
+		sourceColumn: category_name_es
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_name_es
+		dataType: string
+		lineageTag: d07f722c-08a8-4468-81dd-ab5e8e637b30
+		summarizeBy: none
+		sourceColumn: product_name_es
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_name_en
+		dataType: string
+		lineageTag: 97a06d18-2066-4493-838d-8474edaef13a
+		summarizeBy: none
+		sourceColumn: product_name_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a8978227-f602-4874-926e-a0d2fbc95eb8
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_product = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_product"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

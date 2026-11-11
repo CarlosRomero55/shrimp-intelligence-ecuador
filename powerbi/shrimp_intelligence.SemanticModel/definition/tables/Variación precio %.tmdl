@@ -1,0 +1,26 @@
+table 'Variación precio %'
+	lineageTag: 3ec0e015-35df-4dd4-aba2-a34e8df020d0
+
+	measure 'Valor de Variación precio %' = SELECTEDVALUE('Variación precio %'[Var precio], 0)
+		formatString: 0
+		lineageTag: 18a11aab-a3d8-4ad9-981b-a34193d13fbe
+
+	column 'Var precio'
+		formatString: 0
+		lineageTag: 45be48f2-bc6f-47b2-bd2f-218bf3e9b2fb
+		summarizeBy: none
+		sourceColumn: [Value]
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 0
+				}
+
+		annotation SummarizationSetBy = User
+
+	partition 'Variación precio %' = calculated
+		mode: import
+		source = GENERATESERIES(-30, 30, 1)
+
+	annotation PBI_Id = 21ef2b32833e4a428898d96a40c6a65a
+

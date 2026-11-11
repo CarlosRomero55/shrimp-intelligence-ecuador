@@ -1,0 +1,125 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "aa955512298c41d67012",
+  "position": {
+    "x": 630.76923076923072,
+    "y": 275,
+    "z": 6,
+    "height": 171.15384615384616,
+    "width": 834.61538461538464,
+    "tabOrder": 6
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_date"
+                    }
+                  },
+                  "Property": "calendar_year"
+                }
+              },
+              "queryRef": "Sum(dim_date.calendar_year)",
+              "nativeQueryRef": "calendar_year"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor USD"
+                }
+              },
+              "queryRef": "_Medidas.Valor USD",
+              "nativeQueryRef": "Valor USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor mercado principal USD"
+                }
+              },
+              "queryRef": "_Medidas.Valor mercado principal USD",
+              "nativeQueryRef": "Valor mercado principal USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor escenario USD"
+                }
+              },
+              "queryRef": "_Medidas.Valor escenario USD",
+              "nativeQueryRef": "Valor escenario USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Impacto escenario USD"
+                }
+              },
+              "queryRef": "_Medidas.Impacto escenario USD",
+              "nativeQueryRef": "Impacto escenario USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Impacto escenario %"
+                }
+              },
+              "queryRef": "_Medidas.Impacto escenario %",
+              "nativeQueryRef": "Impacto escenario %"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "dim_date"
+                  }
+                },
+                "Property": "calendar_year"
+              }
+            },
+            "direction": "Ascending"
+          }
+        ]
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

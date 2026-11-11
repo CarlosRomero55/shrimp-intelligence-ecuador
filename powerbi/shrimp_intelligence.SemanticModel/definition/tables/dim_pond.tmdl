@@ -1,0 +1,91 @@
+table dim_pond
+	lineageTag: 10893ef1-31c6-49ab-a17f-d40bee3e9c1f
+
+	column pond_key
+		dataType: int64
+		formatString: 0
+		lineageTag: b98dc5d3-a2f4-4e56-b4b9-fa16f07d8ee1
+		summarizeBy: none
+		sourceColumn: pond_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column pond_code
+		dataType: string
+		lineageTag: f4df2f64-c2bd-4afb-9726-97953d7cae0d
+		summarizeBy: none
+		sourceColumn: pond_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column farm_code
+		dataType: string
+		lineageTag: 497938fa-2ca7-4795-a31e-ec43ec8096ac
+		summarizeBy: none
+		sourceColumn: farm_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column farm_name
+		dataType: string
+		lineageTag: defbd4af-2a1a-4414-b527-74c658400e90
+		summarizeBy: none
+		sourceColumn: farm_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column province
+		dataType: string
+		lineageTag: 623aa12a-a84e-4a9c-a8b2-c2af7a9fd7d0
+		summarizeBy: none
+		sourceColumn: province
+
+		annotation SummarizationSetBy = Automatic
+
+	column area_ha
+		dataType: double
+		lineageTag: c723557f-d1b1-475b-91e9-e6f22c8fb607
+		summarizeBy: sum
+		sourceColumn: area_ha
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column area_band
+		dataType: string
+		lineageTag: 35fa3a29-111a-4d0f-909f-7877ba985984
+		summarizeBy: none
+		sourceColumn: area_band
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_simulated
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 0a20268f-da23-4cfe-8a75-7c398dfb37b0
+		summarizeBy: none
+		sourceColumn: is_simulated
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: bda566af-7ddf-488a-8ae6-d9e9a23de823
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_pond = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_pond"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "0acf126b5a7073d05694",
+  "position": {
+    "x": 629.84126984126988,
+    "y": 0,
+    "z": 2,
+    "height": 275.73696145124717,
+    "width": 599.3650793650794,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_pond"
+                    }
+                  },
+                  "Property": "pond_code"
+                }
+              },
+              "queryRef": "dim_pond.pond_code",
+              "nativeQueryRef": "pond_code"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Margen finca %"
+                }
+              },
+              "queryRef": "_Medidas.Margen finca %",
+              "nativeQueryRef": "Margen finca %"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "FCR"
+                }
+              },
+              "queryRef": "_Medidas.FCR",
+              "nativeQueryRef": "FCR"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Precio por libra finca"
+                }
+              },
+              "queryRef": "_Medidas.Precio por libra finca",
+              "nativeQueryRef": "Precio por libra finca"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Costo por libra finca"
+                }
+              },
+              "queryRef": "_Medidas.Costo por libra finca",
+              "nativeQueryRef": "Costo por libra finca"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Ciclos"
+                }
+              },
+              "queryRef": "_Medidas.Ciclos",
+              "nativeQueryRef": "Ciclos"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "_Medidas"
+                  }
+                },
+                "Property": "Margen finca %"
+              }
+            },
+            "direction": "Descending"
+          }
+        ]
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

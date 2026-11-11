@@ -1,0 +1,8 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/page/2.1.0/schema.json",
+  "name": "92150d6f1d8a485253a0",
+  "displayName": "Finca (SIMULADO)",
+  "displayOption": "FitToPage",
+  "height": 1080,
+  "width": 1920
+}

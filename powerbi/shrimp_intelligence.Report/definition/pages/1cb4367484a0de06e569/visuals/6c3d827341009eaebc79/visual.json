@@ -1,0 +1,336 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
+  "name": "6c3d827341009eaebc79",
+  "position": {
+    "x": 10.158730158730158,
+    "y": 0,
+    "z": 0,
+    "height": 336.68934240362813,
+    "width": 512.29024943310651,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_date"
+                    }
+                  },
+                  "Property": "calendar_year"
+                }
+              },
+              "queryRef": "Sum(dim_date.calendar_year)",
+              "nativeQueryRef": "calendar_year"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor USD"
+                }
+              },
+              "queryRef": "_Medidas.Valor USD",
+              "nativeQueryRef": "Valor USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor con país USD"
+                }
+              },
+              "queryRef": "_Medidas.Valor con país USD",
+              "nativeQueryRef": "Valor con país USD"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Libras identificadas"
+                }
+              },
+              "queryRef": "_Medidas.Libras identificadas",
+              "nativeQueryRef": "Libras identificadas"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "USD por libra"
+                }
+              },
+              "queryRef": "_Medidas.USD por libra",
+              "nativeQueryRef": "USD por libra"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Cobertura país %"
+                }
+              },
+              "queryRef": "_Medidas.Cobertura país %",
+              "nativeQueryRef": "Cobertura país %"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "YoY %"
+                }
+              },
+              "queryRef": "_Medidas.YoY %",
+              "nativeQueryRef": "YoY %"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Valor USD año anterior"
+                }
+              },
+              "queryRef": "_Medidas.Valor USD año anterior",
+              "nativeQueryRef": "Valor USD año anterior"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "HHI"
+                }
+              },
+              "queryRef": "_Medidas.HHI",
+              "nativeQueryRef": "HHI"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "Top 3 %"
+                }
+              },
+              "queryRef": "_Medidas.Top 3 %",
+              "nativeQueryRef": "Top 3 %"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "_Medidas"
+                    }
+                  },
+                  "Property": "HHI comparable"
+                }
+              },
+              "queryRef": "_Medidas.HHI comparable",
+              "nativeQueryRef": "HHI comparable"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "cb2708a6b07733238b1b",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Valor USD"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "97ffbbb14b00974ac777",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Valor con país USD"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "f5e22163b89b5179dde9",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Libras identificadas"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "5fad6dea5b3d078ab054",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "USD por libra"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "b141b75be0c663d21205",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Cobertura país %"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "e77b64315d2e31a52489",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "dim_date"
+              }
+            },
+            "Property": "calendar_year"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "80f3abad7dd8c148d023",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "YoY %"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "e60c09a3e52a260ca560",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Valor USD año anterior"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "84d4140736b0ccb21e90",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "HHI"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "836d72d705781880904d",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "Top 3 %"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "df9f78cb56551458b442",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "_Medidas"
+              }
+            },
+            "Property": "HHI comparable"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}

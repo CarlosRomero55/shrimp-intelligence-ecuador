@@ -22,4 +22,6 @@ logs/*
 .vscode/
 .idea/
 Thumbs.db
-Desktop.ini
+Desktop.ini # Power BI (Fase 12): caché de datos y configuración local
+**/.pbi/cache.abf
+**/.pbi/localSettings.json

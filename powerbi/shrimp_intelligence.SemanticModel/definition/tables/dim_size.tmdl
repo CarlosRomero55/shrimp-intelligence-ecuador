@@ -1,0 +1,98 @@
+table dim_size
+	lineageTag: f8637f0c-ac66-4249-a12f-3981c576d75d
+
+	column size_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 4b0e3efb-bfbb-4c53-b243-71385961fcac
+		summarizeBy: none
+		sourceColumn: size_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column size_code
+		dataType: string
+		lineageTag: 3d13d13d-41e3-46dc-a5c5-7cba42959842
+		summarizeBy: none
+		sourceColumn: size_code
+		sortByColumn: sort_order
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column min_count
+		dataType: int64
+		formatString: 0
+		lineageTag: f82e8847-e540-408b-ac33-50b0328b8620
+		summarizeBy: sum
+		sourceColumn: min_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column max_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 7427eeab-1123-4f85-bd9a-715562bc2bc4
+		summarizeBy: sum
+		sourceColumn: max_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column min_weight_g
+		dataType: double
+		lineageTag: 8e7d030d-edcc-44e7-801f-1d878b1511ea
+		summarizeBy: sum
+		sourceColumn: min_weight_g
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column max_weight_g
+		dataType: double
+		lineageTag: c7272b75-1624-44a5-9c92-f9e039189d4b
+		summarizeBy: sum
+		sourceColumn: max_weight_g
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column size_group
+		dataType: string
+		lineageTag: 59a395bb-5822-4f94-968a-4ffdd05bd276
+		summarizeBy: none
+		sourceColumn: size_group
+
+		annotation SummarizationSetBy = Automatic
+
+	column sort_order
+		dataType: int64
+		formatString: 0
+		lineageTag: a55e3b16-ca9d-43a9-994e-a5b80015b5de
+		summarizeBy: sum
+		sourceColumn: sort_order
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 6746c8ef-42b4-4696-9b14-c255d89d91a3
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_size = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_size"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+
