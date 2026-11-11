@@ -1,0 +1,95 @@
+table dim_source
+	lineageTag: 485f5396-7da7-4fca-b9bf-331543a38ef9
+
+	column source_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 6f8331ca-cfbb-46ef-b1ba-7ba0a8dd59e2
+		summarizeBy: none
+		sourceColumn: source_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_code
+		dataType: string
+		lineageTag: b513d75f-d31d-4e4f-b7c7-9bff2418d603
+		summarizeBy: none
+		sourceColumn: source_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_name
+		dataType: string
+		lineageTag: 9818f06c-2d38-4a96-9d66-488c530bd3b2
+		summarizeBy: none
+		sourceColumn: source_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column publisher
+		dataType: string
+		lineageTag: 1e9b6d5b-23bf-433d-959f-c690f565604d
+		summarizeBy: none
+		sourceColumn: publisher
+
+		annotation SummarizationSetBy = Automatic
+
+	column weight_unit
+		dataType: string
+		lineageTag: c9e6dec2-6535-4663-8568-64eac052309b
+		summarizeBy: none
+		sourceColumn: weight_unit
+
+		annotation SummarizationSetBy = Automatic
+
+	column valuation_basis
+		dataType: string
+		lineageTag: 3982dd8e-a66f-4b2b-99b3-20cd5e13b7e5
+		summarizeBy: none
+		sourceColumn: valuation_basis
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_simulated
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 1d9230ec-3598-4abf-94c9-b28f0320206b
+		summarizeBy: none
+		sourceColumn: is_simulated
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_reference
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: cf2cd0aa-fac5-4cd8-865a-84608d8c36a5
+		summarizeBy: none
+		sourceColumn: is_reference
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: bb293f8f-17cf-46f2-8faf-dddb3c6295b3
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		variation Variation
+			isDefault
+			relationship: f450bac3-21a1-49fa-9436-b0cedfb886d5
+			defaultHierarchy: LocalDateTable_6a579c53-ba22-4799-8308-de9ab689f811.'Jerarquía de fechas'
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_source = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_source"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

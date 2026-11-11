@@ -1,0 +1,185 @@
+table dim_date
+	lineageTag: 57e5be73-0191-45d6-8699-50dd6bc08585
+	dataCategory: Time
+
+	column date_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 92667f8c-53cd-4797-9814-b7a1e3e9e151
+		summarizeBy: none
+		sourceColumn: date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column full_date
+		dataType: dateTime
+		isKey
+		formatString: Long Date
+		lineageTag: b6ce0098-4e6b-4c03-8d2a-2f1c92a7b22b
+		summarizeBy: none
+		sourceColumn: full_date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column calendar_year
+		dataType: int64
+		formatString: 0
+		lineageTag: 1fa1dcaa-ef75-4e93-8642-3488a1d90a5e
+		summarizeBy: sum
+		sourceColumn: calendar_year
+
+		annotation SummarizationSetBy = Automatic
+
+	column calendar_quarter
+		dataType: int64
+		formatString: 0
+		lineageTag: 800afa4e-4921-432f-af4d-07c85e4feaa4
+		summarizeBy: sum
+		sourceColumn: calendar_quarter
+
+		annotation SummarizationSetBy = Automatic
+
+	column calendar_month
+		dataType: int64
+		formatString: 0
+		lineageTag: 02871550-fdef-450b-91bd-5ed425d65284
+		summarizeBy: sum
+		sourceColumn: calendar_month
+
+		annotation SummarizationSetBy = Automatic
+
+	column month_name_es
+		dataType: string
+		lineageTag: fa7b7086-c518-45d5-826c-6d03f09ae74e
+		summarizeBy: none
+		sourceColumn: month_name_es
+		sortByColumn: calendar_month
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column month_name_en
+		dataType: string
+		lineageTag: 2e16ea99-5b5d-4fbb-a727-00f6e3da491d
+		summarizeBy: none
+		sourceColumn: month_name_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column month_short_es
+		dataType: string
+		lineageTag: 8f091274-26db-4852-b70a-0d4ab03e200a
+		summarizeBy: none
+		sourceColumn: month_short_es
+		sortByColumn: calendar_month
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column period_label
+		dataType: string
+		lineageTag: 7f6d8c11-7d65-4a21-9baf-b095ebed1243
+		summarizeBy: none
+		sourceColumn: period_label
+		sortByColumn: period_key
+
+		changedProperty = SortByColumn
+
+		annotation SummarizationSetBy = Automatic
+
+	column period_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 78b29d71-68fe-495d-91f8-d92b5ad760bd
+		summarizeBy: sum
+		sourceColumn: period_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column month_start_date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 3be56d4a-93f8-4d9b-adf9-acfd528957ef
+		summarizeBy: none
+		sourceColumn: month_start_date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column day_of_month
+		dataType: int64
+		formatString: 0
+		lineageTag: c1098229-49a9-41fb-8c08-82d867c3aac3
+		summarizeBy: sum
+		sourceColumn: day_of_month
+
+		annotation SummarizationSetBy = Automatic
+
+	column iso_day_of_week
+		dataType: int64
+		formatString: 0
+		lineageTag: 33913414-ae49-4a77-833b-77471911c76c
+		summarizeBy: sum
+		sourceColumn: iso_day_of_week
+
+		annotation SummarizationSetBy = Automatic
+
+	column day_name_es
+		dataType: string
+		lineageTag: c77f6753-88f1-42bf-a25d-ed006001d053
+		summarizeBy: none
+		sourceColumn: day_name_es
+
+		annotation SummarizationSetBy = Automatic
+
+	column iso_week
+		dataType: int64
+		formatString: 0
+		lineageTag: 63c31666-5377-405c-b18c-63cd1cefb472
+		summarizeBy: sum
+		sourceColumn: iso_week
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_weekend
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 7bda2df7-98c1-4f34-853e-09833fbc2f3a
+		summarizeBy: none
+		sourceColumn: is_weekend
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_month_start
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 9eab1364-cd77-43b8-95a3-ca7419fa4480
+		summarizeBy: none
+		sourceColumn: is_month_start
+
+		annotation SummarizationSetBy = Automatic
+
+	column ec_coastal_season
+		dataType: string
+		lineageTag: cf747796-8c70-4cc4-86be-63e61ea1d954
+		summarizeBy: none
+		sourceColumn: ec_coastal_season
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_date = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_date"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

@@ -1,0 +1,26 @@
+table 'Variación volumen %'
+	lineageTag: 65e08753-fd6d-4b6e-96a2-7d08f28fd10f
+
+	measure 'Valor de Variación volumen %' = SELECTEDVALUE('Variación volumen %'[Var  volumen], 0)
+		formatString: 0
+		lineageTag: 8a875e8a-de97-4169-805e-859db8806ccb
+
+	column 'Var  volumen'
+		formatString: 0
+		lineageTag: 55c8da22-3dbe-497e-8941-bce3e1b76bd7
+		summarizeBy: none
+		sourceColumn: [Value]
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 0
+				}
+
+		annotation SummarizationSetBy = User
+
+	partition 'Variación volumen %' = calculated
+		mode: import
+		source = GENERATESERIES(-30, 30, 1)
+
+	annotation PBI_Id = b16935964b1444eab47fa69f135b1580
+

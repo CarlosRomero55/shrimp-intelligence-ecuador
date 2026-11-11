@@ -1,0 +1,84 @@
+relationship 62a71c51-9e08-43c6-a6d8-fe46d1e954b7
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dim_country.dw_loaded_at
+	toColumn: LocalDateTable_d755194d-f143-49ed-944c-6f047bca53ec.Date
+
+relationship 88284d5d-bbe4-40cf-8068-6868fc43a174
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dim_pond.dw_loaded_at
+	toColumn: LocalDateTable_919e286c-ef77-4954-bf09-d146197d8a44.Date
+
+relationship c5c4c541-6c3c-494a-9c88-d529e5764187
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dim_product.dw_loaded_at
+	toColumn: LocalDateTable_e19f2446-493e-4fa4-a192-97c2fe6cb49c.Date
+
+relationship 5411af67-df05-4e1b-9411-e0ae67ff61c6
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dim_size.dw_loaded_at
+	toColumn: LocalDateTable_7a61b47d-6363-413e-9b5b-fb10592a4d23.Date
+
+relationship f450bac3-21a1-49fa-9436-b0cedfb886d5
+	joinOnDateBehavior: datePartOnly
+	fromColumn: dim_source.dw_loaded_at
+	toColumn: LocalDateTable_6a579c53-ba22-4799-8308-de9ab689f811.Date
+
+relationship 113695b9-ccdb-4e79-9de4-4752f063362a
+	joinOnDateBehavior: datePartOnly
+	fromColumn: fact_exports.dw_loaded_at
+	toColumn: LocalDateTable_7881226d-ac29-4056-ae19-0b471e9d59e6.Date
+
+relationship 71c4d43f-0e6c-4ee1-b9e0-51a53a8a584c
+	joinOnDateBehavior: datePartOnly
+	fromColumn: fact_production.dw_loaded_at
+	toColumn: LocalDateTable_93fc98d9-894f-4fc1-a48e-0496286c6ec5.Date
+
+relationship c738d4ce-5ceb-4c19-9bc0-0c698741ec16
+	fromColumn: fact_exports.country_key
+	toColumn: dim_country.country_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 4ba9a804-36ae-4b5d-8b54-832c25f5fd9f
+	fromColumn: fact_exports.date_key
+	toColumn: dim_date.date_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 508ddb65-d2d3-41d5-a3a7-5fcd737333c2
+	fromColumn: fact_exports.product_key
+	toColumn: dim_product.product_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 0e50a790-683b-4a02-b984-8360a4d33750
+	fromColumn: fact_exports.source_key
+	toColumn: dim_source.source_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 3216373d-5dee-4ba1-9c7a-6795bbd3138d
+	fromColumn: fact_production.harvest_date_key
+	toColumn: dim_date.date_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 10050a0e-263c-4076-be7c-ab96cb2327e1
+	isActive: false
+	fromColumn: fact_production.stocking_date_key
+	toColumn: dim_date.date_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 2c773a0c-e6ad-4711-ae35-f2ce32021455
+	fromColumn: fact_production.pond_key
+	toColumn: dim_pond.pond_key
+
+	annotation PBI_IsFromSource = FS
+
+relationship 3aee7e63-08c8-42de-82dc-02c6af5be330
+	fromColumn: fact_production.size_key
+	toColumn: dim_size.size_key
+
+	annotation PBI_IsFromSource = FS
+

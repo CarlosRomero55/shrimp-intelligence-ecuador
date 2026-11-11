@@ -1,0 +1,37 @@
+model Model
+	culture: es-MX
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: es-EC
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_QueryOrder = ["dim_country","dim_date","dim_pond","dim_product","dim_size","dim_source","fact_exports","fact_production"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table dim_country
+ref table DateTableTemplate_1f5f570c-165f-48c6-8558-607a45370837
+ref table LocalDateTable_d755194d-f143-49ed-944c-6f047bca53ec
+ref table dim_date
+ref table dim_pond
+ref table LocalDateTable_919e286c-ef77-4954-bf09-d146197d8a44
+ref table dim_product
+ref table LocalDateTable_e19f2446-493e-4fa4-a192-97c2fe6cb49c
+ref table dim_size
+ref table LocalDateTable_7a61b47d-6363-413e-9b5b-fb10592a4d23
+ref table dim_source
+ref table LocalDateTable_6a579c53-ba22-4799-8308-de9ab689f811
+ref table fact_exports
+ref table LocalDateTable_7881226d-ac29-4056-ae19-0b471e9d59e6
+ref table fact_production
+ref table LocalDateTable_93fc98d9-894f-4fc1-a48e-0496286c6ec5
+ref table _Medidas
+ref table 'Variación precio %'
+ref table 'Variación volumen %'
+
+ref cultureInfo es-MX
+

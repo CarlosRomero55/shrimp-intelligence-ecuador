@@ -1,0 +1,102 @@
+table dim_country
+	lineageTag: 0c30da44-cdd3-40f1-8dcc-a9fcd2e371f6
+
+	column country_key
+		dataType: int64
+		formatString: 0
+		lineageTag: 64b2edbc-9b7a-437c-a210-99ee808bcb32
+		summarizeBy: none
+		sourceColumn: country_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column iso3
+		dataType: string
+		lineageTag: 2784ca53-b7d9-4c22-a719-a14cb6551bd0
+		summarizeBy: none
+		sourceColumn: iso3
+
+		annotation SummarizationSetBy = Automatic
+
+	column m49_code
+		dataType: int64
+		formatString: 0
+		lineageTag: a82ab5d9-8aa2-496e-b8be-ff65e4e07c31
+		summarizeBy: sum
+		sourceColumn: m49_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column country_name_es
+		dataType: string
+		lineageTag: c54811cc-3875-4449-bb9c-fe2289d522b7
+		summarizeBy: none
+		sourceColumn: country_name_es
+
+		annotation SummarizationSetBy = Automatic
+
+	column country_name_en
+		dataType: string
+		lineageTag: ba7b3713-c333-4f7e-925e-b38142ecb271
+		summarizeBy: none
+		sourceColumn: country_name_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column region_code_m49
+		dataType: string
+		lineageTag: cdfd8a66-3e94-4b64-a2be-9ca1f57a8484
+		summarizeBy: none
+		sourceColumn: region_code_m49
+
+		annotation SummarizationSetBy = Automatic
+
+	column region_name_es
+		dataType: string
+		lineageTag: cdc2b9d2-5447-4f45-a313-03982f96a8a9
+		summarizeBy: none
+		sourceColumn: region_name_es
+
+		annotation SummarizationSetBy = Automatic
+
+	column region_name_en
+		dataType: string
+		lineageTag: 1b0a0410-967d-4049-9119-7e3437b5c3b8
+		summarizeBy: none
+		sourceColumn: region_name_en
+
+		annotation SummarizationSetBy = Automatic
+
+	column cna_market_group
+		dataType: string
+		lineageTag: e82acfe0-23a0-47a9-aeff-eec9b547a5c2
+		summarizeBy: none
+		sourceColumn: cna_market_group
+
+		annotation SummarizationSetBy = Automatic
+
+	column dw_loaded_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: ac5eb328-3540-4700-876c-7fd2d88618ab
+		summarizeBy: none
+		sourceColumn: dw_loaded_at
+
+		variation Variation
+			isDefault
+			relationship: 62a71c51-9e08-43c6-a6d8-fe46d1e954b7
+			defaultHierarchy: LocalDateTable_d755194d-f143-49ed-944c-6f047bca53ec.'Jerarquía de fechas'
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_country = m
+		mode: import
+		source =
+				let
+				  Origen = MySQL.Database("localhost", "gold"),
+				  #"Navegación 1" = Origen{[Schema = "gold", Item = "dim_country"]}[Data]
+				in
+				  #"Navegación 1"
+
+	annotation PBI_ResultType = Table
+

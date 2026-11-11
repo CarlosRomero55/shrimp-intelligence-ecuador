@@ -1,0 +1,271 @@
+table _Medidas
+	lineageTag: b902e701-038b-4f8f-8dec-bae03df1a961
+
+	measure 'Valor USD' =
+			
+			CALCULATE ( SUM ( fact_exports[value_usd] ), fact_exports[is_preferred] = TRUE () )
+		lineageTag: 3122d60c-5530-496b-96ce-cc6a09e31889
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Valor con país USD' =
+			
+			CALCULATE ( [Valor USD], fact_exports[country_key] <> 9999 )
+		lineageTag: 812b87d3-e18b-4e6f-8fd4-6c775a1395fd
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Libras identificadas' =
+			
+			CALCULATE (
+			    SUM ( fact_exports[weight_lb] ),
+			    fact_exports[is_preferred] = TRUE (),
+			    fact_exports[country_key] <> 9999,
+			    fact_exports[weight_lb] > 0)
+		formatString: #,0
+		lineageTag: a73ab509-5990-4c18-8c8b-589282b7ec8e
+
+	measure 'USD por libra' =
+			
+			DIVIDE (
+			    CALCULATE ( [Valor USD], fact_exports[country_key] <> 9999, fact_exports[weight_lb] > 0 ),
+			    [Libras identificadas]
+			)
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		lineageTag: 5c90ef7b-7e95-4379-b235-3f47663900aa
+
+		annotation PBI_FormatHint = {"currencyCulture":"es-US"}
+
+	measure 'Cobertura país %' =
+			
+			DIVIDE ( [Valor con país USD], [Valor USD] )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		lineageTag: 79162b88-dced-4883-8cbb-c8e1ab076373
+
+	measure 'Valor USD año anterior' =
+			
+			VAR UltimoMesConDato =
+			    CALCULATE (
+			        MAX ( fact_exports[date_key] ),
+			        ALL ( fact_exports ),
+			        fact_exports[is_preferred] = TRUE ()
+			    )
+			VAR FechaCorte =
+			    EOMONTH (
+			        DATE ( INT ( UltimoMesConDato / 10000 ), MOD ( INT ( UltimoMesConDato / 100 ), 100 ), 1 ),
+			        0
+			    )
+			RETURN
+			    CALCULATE (
+			        [Valor USD],
+			        SAMEPERIODLASTYEAR (
+			            FILTER ( VALUES ( dim_date[full_date] ), dim_date[full_date] <= FechaCorte )
+			        )
+			    )
+		formatString: \$#,0;(\$#,0);\$#,0
+		lineageTag: 92c924a0-8d9f-4905-b0d1-c722c44d3a40
+
+		annotation PBI_FormatHint = {"currencyCulture":"es-US"}
+
+	measure 'YoY %' = ```
+			
+			VAR Actual = [Valor USD]
+			VAR Anterior = [Valor USD año anterior]
+			RETURN
+			    IF ( NOT ISBLANK ( Actual ) && NOT ISBLANK ( Anterior ), DIVIDE ( Actual - Anterior, Anterior ) )
+			
+			```
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		lineageTag: af5f093a-02c8-44e3-b5e2-258bce061439
+
+	measure 'Valor USD YTD' =
+			
+			IF ( NOT ISBLANK ( [Valor USD] ), TOTALYTD ( [Valor USD], dim_date[full_date] ) )
+		formatString: \$#,0.###############;(\$#,0.###############);\$#,0.###############
+		lineageTag: 41b40f99-cdcc-4423-9009-d28e69394562
+
+	measure 'Promedio móvil 3M' =
+			
+			IF (
+			    NOT ISBLANK ( [Valor USD] ),
+			    CALCULATE (
+			        AVERAGEX ( VALUES ( dim_date[period_key] ), [Valor USD] ),
+			        DATESINPERIOD ( dim_date[full_date], MAX ( dim_date[full_date] ), -3, MONTH )
+			    )
+			)
+		formatString: \$#,0.###############;(\$#,0.###############);\$#,0.###############
+		lineageTag: dd266477-41f6-4654-bc75-a2206b693b25
+
+	measure 'Participación %' =
+			
+			DIVIDE ( [Valor USD], CALCULATE ( [Valor USD], REMOVEFILTERS ( dim_country ) ) )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		lineageTag: ba567fe7-a65e-494d-9388-1459c14a647f
+
+	measure 'Ranking país' =
+			
+			VAR Llave = SELECTEDVALUE ( dim_country[country_key] )
+			RETURN
+			    IF (
+			        NOT ISBLANK ( [Valor USD] ) && NOT ISBLANK ( Llave ) && NOT Llave IN { 0, 9999 },
+			        RANKX (
+			            FILTER ( ALL ( dim_country ), NOT dim_country[country_key] IN { 0, 9999 } ),
+			            [Valor USD],
+			            ,
+			            DESC,
+			            DENSE
+			        )
+			    )
+		formatString: 0
+		lineageTag: 719b6e73-a2cc-4467-8285-cecd6a52b576
+
+	measure HHI =
+			
+			VAR Paises = FILTER ( ALL ( dim_country ), NOT dim_country[country_key] IN { 0, 9999 } )
+			VAR Total = SUMX ( Paises, [Valor USD] )
+			RETURN
+			    SUMX ( Paises, VAR Cuota = DIVIDE ( [Valor USD], Total ) * 100 RETURN Cuota * Cuota )
+		formatString: #,0
+		lineageTag: 83f29489-7f12-4e85-9969-081a52f8dbaa
+
+	measure 'Top 3 %' =
+			
+			VAR Paises = FILTER ( ALL ( dim_country ), NOT dim_country[country_key] IN { 0, 9999 } )
+			VAR Total = SUMX ( Paises, [Valor USD] )
+			RETURN
+			    DIVIDE ( SUMX ( TOPN ( 3, Paises, [Valor USD], DESC ), [Valor USD] ), Total )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		lineageTag: 2e0ecfb2-30b0-458f-8550-9c52c6131372
+
+	measure 'HHI comparable' =
+			
+			IF (
+			    NOT ISBLANK ( [Valor USD] ),
+			    IF ( [Cobertura país %] >= 0.8, "Comparable", "No comparable (falta país)" )
+			)
+		lineageTag: 6a2540e6-2625-4976-acec-8b5ff591482d
+
+	measure 'Ingresos finca USD' = SUM ( fact_production[revenue_usd] )
+		formatString: \$#,0.###############;(\$#,0.###############);\$#,0.###############
+		displayFolder: Finca (SIMULADO)
+		lineageTag: a18d778e-7ddb-48f5-bbc5-771152c761d5
+
+	measure 'Costo finca USD' = SUM ( fact_production[total_cost_usd] )
+		formatString: \$#,0.###############;(\$#,0.###############);\$#,0.###############
+		displayFolder: Finca (SIMULADO)
+		lineageTag: e9a13bf8-18dc-4600-84f0-7cbeb70145c7
+
+	measure 'Margen finca %' = DIVIDE ( [Ingresos finca USD] - [Costo finca USD], [Ingresos finca USD] )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		displayFolder: Finca (SIMULADO)
+		lineageTag: e85b1446-34fa-4991-991a-5b30d55cafaa
+
+	measure 'Libras cosechadas' = SUM ( fact_production[harvested_lb] )
+		formatString: #,0
+		displayFolder: Finca (SIMULADO)
+		lineageTag: 96ec8512-9950-4f78-9287-f80fd584bf02
+
+	measure FCR = DIVIDE ( SUM ( fact_production[feed_kg] ), SUM ( fact_production[harvested_kg] ) )
+		formatString: 0.00
+		displayFolder: Finca (SIMULADO)
+		lineageTag: a5876554-c212-4de4-91df-b397fd005c18
+
+	measure 'Supervivencia %' =
+			
+			DIVIDE ( SUM ( fact_production[harvested_animals] ), SUM ( fact_production[larvae_stocked] ) )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		displayFolder: Finca (SIMULADO)
+		lineageTag: 33d9415e-14cd-4050-8fc1-b178bebf32ec
+
+	measure 'Libras por hectárea' = DIVIDE ( [Libras cosechadas], SUM ( fact_production[area_ha] ) )
+		formatString: #,0
+		displayFolder: Finca (SIMULADO)
+		lineageTag: a2343788-5777-4661-ae80-8abd9886c7a3
+
+	measure 'Costo por libra finca' = DIVIDE ( [Costo finca USD], [Libras cosechadas] )
+		displayFolder: Finca (SIMULADO)
+		lineageTag: 0ff91add-c13e-490e-b332-3e8905aa01e8
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Precio por libra finca' = DIVIDE ( [Ingresos finca USD], [Libras cosechadas] )
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Finca (SIMULADO)
+		lineageTag: 42dd8a4b-d226-4c89-87eb-821a068ca0bf
+
+		annotation PBI_FormatHint = {"currencyCulture":"es-US"}
+
+	measure Ciclos = COUNTROWS ( fact_production )
+		formatString: 0
+		displayFolder: Finca (SIMULADO)
+		lineageTag: 66b2ff45-78c0-460a-ad57-9d5bde1ee0d3
+
+	measure 'Valor mercado principal USD' =
+			
+			CALCULATE ( [Valor USD], KEEPFILTERS ( dim_country[iso3] = "CHN" ) )
+		lineageTag: e633dfad-b4cd-4dfe-90eb-c60e26d4b92c
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Valor escenario USD' =
+			
+			VAR CambioPrecio = [Valor de Variación precio %] / 100
+			VAR CambioVolumen = [Valor de Variación volumen %] / 100
+			VAR Principal = [Valor mercado principal USD]
+			VAR Resto = [Valor USD] - Principal
+			RETURN
+			    Principal * ( 1 + CambioPrecio ) * ( 1 + CambioVolumen ) + Resto
+		lineageTag: 2412ff13-f3af-4d4f-b01a-a1cbd299a234
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Impacto escenario USD' = [Valor escenario USD] - [Valor USD]
+		lineageTag: 3abcd5c6-2c61-4d1d-b647-93e1ae11a40b
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Impacto escenario %' = DIVIDE ( [Impacto escenario USD], [Valor USD] )
+		formatString: 0.0\ %;-0.0\ %;0.0\ %
+		lineageTag: e8e08e9d-b171-44fc-9613-2c9b73fbeea3
+
+	measure 'Título resumen' =
+			
+			VAR Anio = SELECTEDVALUE ( dim_date[calendar_year] )
+			RETURN
+			    IF (
+			        ISBLANK ( Anio ),
+			        "Exportaciones de camarón del Ecuador, 2018–2026",
+			        "En " & Anio & " Ecuador exportó "
+			            & FORMAT ( [Valor USD] / 1000000, "#,0", "es-ES" ) & " M USD de camarón"
+			            & IF (
+			                NOT ISBLANK ( [YoY %] ),
+			                " (" & FORMAT ( [YoY %], "+0.0 %;-0.0 %", "es-ES" ) & " frente al año anterior)"
+			            )
+			    )
+		lineageTag: d4078a47-72f1-4583-b30c-a13a7b5788ee
+
+	measure 'Aviso cobertura' =
+			
+			IF (
+			    [Cobertura país %] < 0.8,
+			    "⚠ Solo el " & FORMAT ( [Cobertura país %], "0 %" )
+			        & " del valor tiene país identificado: el detalle por país de este período no es comparable.",
+			    ""
+			)
+		lineageTag: 36264c6f-d1f2-4f0c-8276-d8a3e3013b27
+
+	column Value
+		formatString: 0
+		lineageTag: 0717ee49-74dd-4483-a8e8-55c6ebbefc20
+		summarizeBy: sum
+		isNameInferred
+		sourceColumn: [Value]
+
+		annotation SummarizationSetBy = Automatic
+
+	partition _Medidas = calculated
+		mode: import
+		source = {BLANK()}
+
+	annotation PBI_Id = 7e10d5cb88f54adebe1194a5652a11d7
+
