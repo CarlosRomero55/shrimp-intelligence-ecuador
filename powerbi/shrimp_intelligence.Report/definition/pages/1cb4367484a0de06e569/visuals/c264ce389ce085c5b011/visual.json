@@ -91,6 +91,11 @@
         }
       ]
     },
+    "syncGroup": {
+      "groupName": "Var  volumen",
+      "fieldChanges": true,
+      "filterChanges": true
+    },
     "drillFilterOtherVisuals": true
   }
 }

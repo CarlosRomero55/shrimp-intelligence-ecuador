@@ -171,6 +171,11 @@
         }
       ]
     },
+    "syncGroup": {
+      "groupName": "calendar_year",
+      "fieldChanges": true,
+      "filterChanges": true
+    },
     "drillFilterOtherVisuals": true
   },
   "filterConfig": {

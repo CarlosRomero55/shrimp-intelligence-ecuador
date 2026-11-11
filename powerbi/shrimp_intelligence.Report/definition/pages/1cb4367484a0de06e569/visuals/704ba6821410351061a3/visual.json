@@ -41,7 +41,7 @@
             "numericStart": {
               "expr": {
                 "Literal": {
-                  "Value": "10D"
+                  "Value": "0D"
                 }
               }
             }
@@ -78,7 +78,7 @@
                         },
                         "Right": {
                           "Literal": {
-                            "Value": "10D"
+                            "Value": "0D"
                           }
                         }
                       }
@@ -90,6 +90,11 @@
           }
         }
       ]
+    },
+    "syncGroup": {
+      "groupName": "Var precio",
+      "fieldChanges": true,
+      "filterChanges": true
     },
     "drillFilterOtherVisuals": true
   }

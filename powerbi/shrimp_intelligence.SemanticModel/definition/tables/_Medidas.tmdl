@@ -254,6 +254,73 @@ table _Medidas
 			)
 		lineageTag: 36264c6f-d1f2-4f0c-8276-d8a3e3013b27
 
+	measure 'USD por libra FOB' = ```
+			
+			   CALCULATE ( [USD por libra], KEEPFILTERS ( dim_source[source_code] = "UN_COMTRADE" ) )
+			```
+		lineageTag: ef21eadd-0464-4c1b-b34b-424e69cc7be9
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Índice estacional' = ```
+			
+			   VAR AniosCompletos =
+			       FILTER (
+			           ALL ( dim_date[calendar_year] ),
+			           CALCULATE (
+			               DISTINCTCOUNT ( fact_exports[date_key] ),
+			               ALLEXCEPT ( dim_date, dim_date[calendar_year] )
+			           ) = 12
+			       )
+			   RETURN
+			       AVERAGEX (
+			           AniosCompletos,
+			           VAR ValorMes = [Valor USD]
+			           VAR ValorAnio = CALCULATE ( [Valor USD], ALLEXCEPT ( dim_date, dim_date[calendar_year] ) )
+			           RETURN DIVIDE ( 12 * ValorMes, ValorAnio ) * 100
+			       )
+			```
+		lineageTag: e84637c5-35a9-4caf-95b3-e380f818b8d7
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Meses FOB' = ```
+			
+			   CALCULATE (
+			       DISTINCTCOUNT ( fact_exports[date_key] ),
+			       KEEPFILTERS ( dim_source[source_code] = "UN_COMTRADE" ),
+			       fact_exports[weight_lb] > 0
+			   )
+			```
+		formatString: 0
+		lineageTag: d8a3dba5-34bc-4b49-8e07-c3a1962b9ec0
+
+	measure 'USD por libra FOB (≥3 meses)' = ```
+			
+			   IF ( [Meses FOB] >= 3, [USD por libra FOB] )
+			```
+		lineageTag: fe88c2fd-1645-4d9f-8d07-3f8e826edf2c
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 'Texto escenario' =
+			
+			VAR P = [Valor de Variación precio %]
+			VAR V = [Valor de Variación volumen %]
+			VAR Impacto = [Impacto escenario USD]
+			RETURN
+			    IF (
+			        P = 0 && V = 0,
+			        "Mueve los deslizadores para simular un cambio de precio o volumen en el mercado chino.",
+			        "Con precio " & FORMAT ( P / 100, "+0 %;-0 %;0 %" )
+			            & " y volumen " & FORMAT ( V / 100, "+0 %;-0 %;0 %" )
+			            & " en China, Ecuador "
+			            & IF ( Impacto < 0, "dejaría de recibir ", "ganaría " )
+			            & FORMAT ( ABS ( Impacto ) / 1000000, "#,0" ) & " M USD ("
+			            & FORMAT ( [Impacto escenario %], "+0.0 %;-0.0 %","es-ES" ) & " del total de 2024)."
+			    )
+		lineageTag: ce93e34a-7817-4d5e-953c-86c5d3cfb3c3
+
 	column Value
 		formatString: 0
 		lineageTag: 0717ee49-74dd-4483-a8e8-55c6ebbefc20
