@@ -91,11 +91,6 @@ table fact_exports
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: 113695b9-ccdb-4e79-9de4-4752f063362a
-			defaultHierarchy: LocalDateTable_7881226d-ac29-4056-ae19-0b471e9d59e6.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition fact_exports = m

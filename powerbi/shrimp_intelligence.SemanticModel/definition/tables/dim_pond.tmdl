@@ -76,11 +76,6 @@ table dim_pond
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: 88284d5d-bbe4-40cf-8068-6868fc43a174
-			defaultHierarchy: LocalDateTable_919e286c-ef77-4954-bf09-d146197d8a44.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition dim_pond = m

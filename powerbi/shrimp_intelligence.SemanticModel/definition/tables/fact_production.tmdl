@@ -197,11 +197,6 @@ table fact_production
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: 71c4d43f-0e6c-4ee1-b9e0-51a53a8a584c
-			defaultHierarchy: LocalDateTable_93fc98d9-894f-4fc1-a48e-0496286c6ec5.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition fact_production = m

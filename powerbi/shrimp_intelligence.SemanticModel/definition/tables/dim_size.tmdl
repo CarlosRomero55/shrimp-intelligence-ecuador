@@ -80,11 +80,6 @@ table dim_size
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: 5411af67-df05-4e1b-9411-e0ae67ff61c6
-			defaultHierarchy: LocalDateTable_7a61b47d-6363-413e-9b5b-fb10592a4d23.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition dim_size = m

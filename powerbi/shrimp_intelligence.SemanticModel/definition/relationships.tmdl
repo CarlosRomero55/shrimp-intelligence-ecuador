@@ -1,38 +1,3 @@
-relationship 62a71c51-9e08-43c6-a6d8-fe46d1e954b7
-	joinOnDateBehavior: datePartOnly
-	fromColumn: dim_country.dw_loaded_at
-	toColumn: LocalDateTable_d755194d-f143-49ed-944c-6f047bca53ec.Date
-
-relationship 88284d5d-bbe4-40cf-8068-6868fc43a174
-	joinOnDateBehavior: datePartOnly
-	fromColumn: dim_pond.dw_loaded_at
-	toColumn: LocalDateTable_919e286c-ef77-4954-bf09-d146197d8a44.Date
-
-relationship c5c4c541-6c3c-494a-9c88-d529e5764187
-	joinOnDateBehavior: datePartOnly
-	fromColumn: dim_product.dw_loaded_at
-	toColumn: LocalDateTable_e19f2446-493e-4fa4-a192-97c2fe6cb49c.Date
-
-relationship 5411af67-df05-4e1b-9411-e0ae67ff61c6
-	joinOnDateBehavior: datePartOnly
-	fromColumn: dim_size.dw_loaded_at
-	toColumn: LocalDateTable_7a61b47d-6363-413e-9b5b-fb10592a4d23.Date
-
-relationship f450bac3-21a1-49fa-9436-b0cedfb886d5
-	joinOnDateBehavior: datePartOnly
-	fromColumn: dim_source.dw_loaded_at
-	toColumn: LocalDateTable_6a579c53-ba22-4799-8308-de9ab689f811.Date
-
-relationship 113695b9-ccdb-4e79-9de4-4752f063362a
-	joinOnDateBehavior: datePartOnly
-	fromColumn: fact_exports.dw_loaded_at
-	toColumn: LocalDateTable_7881226d-ac29-4056-ae19-0b471e9d59e6.Date
-
-relationship 71c4d43f-0e6c-4ee1-b9e0-51a53a8a584c
-	joinOnDateBehavior: datePartOnly
-	fromColumn: fact_production.dw_loaded_at
-	toColumn: LocalDateTable_93fc98d9-894f-4fc1-a48e-0496286c6ec5.Date
-
 relationship c738d4ce-5ceb-4c19-9bc0-0c698741ec16
 	fromColumn: fact_exports.country_key
 	toColumn: dim_country.country_key

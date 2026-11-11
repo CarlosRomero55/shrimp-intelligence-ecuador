@@ -82,11 +82,6 @@ table dim_country
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: 62a71c51-9e08-43c6-a6d8-fe46d1e954b7
-			defaultHierarchy: LocalDateTable_d755194d-f143-49ed-944c-6f047bca53ec.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition dim_country = m

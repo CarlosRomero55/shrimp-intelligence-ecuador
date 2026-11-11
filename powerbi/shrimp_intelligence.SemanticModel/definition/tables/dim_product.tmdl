@@ -65,11 +65,6 @@ table dim_product
 		summarizeBy: none
 		sourceColumn: dw_loaded_at
 
-		variation Variation
-			isDefault
-			relationship: c5c4c541-6c3c-494a-9c88-d529e5764187
-			defaultHierarchy: LocalDateTable_e19f2446-493e-4fa4-a192-97c2fe6cb49c.'Jerarquía de fechas'
-
 		annotation SummarizationSetBy = Automatic
 
 	partition dim_product = m
